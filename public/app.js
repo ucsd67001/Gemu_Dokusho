@@ -596,26 +596,58 @@ const 動き = {
   投稿して終える: async el=>{
     el.disabled = true;
     el.textContent = "投稿の準備をしています…";
-    // ⚠️ 窓は押した瞬間に開く。絵を置き終わってから開くと、ポップアップとして止められる
-    const 窓 = open("", "_blank");
     const { 題, 分, 場所 } = 読み終えの中身;
-    let 行き先 = location.origin + 根;
-    try{ if(読み終えの絵) 行き先 = await 土台.共有を作る(読み終えの絵, { 題, 分, 場所 }); }
-    catch(e){ console.error(e); 知らせる("絵を置けませんでした。文だけで投稿します", true); }
     const 文 = `『${題}』を${分}分、${場所}のベンチで読みました。\n#GEMuの静かな読書会`;
+    const 入口 = location.origin + 根;
+    const 絵 = 読み終えの絵;
+
+    // スマホ：共有の画面から X を選ぶと、画像が添付された投稿画面になる
+    if(絵 && matchMedia("(pointer: coarse)").matches && navigator.canShare){
+      const ファイル = new File([絵.png], "gemu-dokusho.png", { type:"image/png" });
+      if(navigator.canShare({ files:[ファイル] })){
+        try{
+          await navigator.share({ files:[ファイル], text:`${文}\n${入口}` });
+          return 終える();
+        }catch(e){
+          if(e.name === "AbortError"){ el.disabled = false; el.textContent = "X に投稿して終える"; return; }
+          console.error(e);   // ほかの失敗は、パソコンと同じやり方へ
+        }
+      }
+    }
+
+    // パソコン：画像をコピーしてから投稿画面を開く。投稿画面で貼り付けると、画像が添付される
+    // ⚠️ コピーは、投稿画面を開く前に（開くとこのページから操作が外れ、コピーが断られる）
+    let 写した = false;
+    if(絵 && navigator.clipboard?.write && window.ClipboardItem){
+      try{ await navigator.clipboard.write([new ClipboardItem({ "image/png":絵.png })]); 写した = true; }
+      catch(e){ console.error(e); }
+    }
+    // ⚠️ 窓は、絵を置く前に開く。置き終わってから開くと、ポップアップとして止められる
+    const 窓 = open("", "_blank");
+    // コピーできなかったときだけ、絵を置いた記録ページのリンクを付ける（X がリンクから絵を出す）
+    let 行き先 = 入口;
+    if(!写した && 絵){
+      try{ 行き先 = await 土台.共有を作る(絵.jpeg, { 題, 分, 場所 }); }
+      catch(e){ console.error(e); }
+    }
     const 先 = "https://x.com/intent/post?text=" + encodeURIComponent(文) + "&url=" + encodeURIComponent(行き先);
     if(窓){ 窓.opener = null; 窓.location.href = 先; }
     else open(先, "_blank", "noopener");
     await 終える();
+    if(写した) 窓を出す("画像を貼り付けてください", `
+      <p class="窓の文">画像をコピーしました。開いた X の投稿画面で <b>Ctrl+V</b>（Mac は <b>⌘+V</b>）を押すと、画像が添付されます。</p>
+      <div class="共有の見本"><img src="${URL.createObjectURL(絵.png)}" alt="コピーした絵"></div>
+      <div class="釦たち"><button class="釦" data-する="窓を閉じる">閉じる</button></div>`);
   },
 };
 
 /* ── 読み終える ─────────────────────────────
    2026-09-27 配信者：X への投稿は、読み終えるときに「投稿しますか？」と聞き、
    はいなら、絵・書名・読んだ時間と一緒に投稿する。
-   ⚠️ X の投稿画面を開く形（intent）では、画像を添付できない。
-      → 絵を置いた「読書の記録ページ」（/s/{id}。functions の sharePage）のリンクを付ける。
-        X がリンクから絵（og:image）を読み取り、投稿に大きく出す
+   ⚠️ X の投稿画面を開く形（intent）では、画像を添付できない。配信者は**画像を添付した形**を望んだ（2026-09-27）。
+      → スマホ：共有の画面（navigator.share）で画像ごと X に渡す
+        パソコン：画像をクリップボードにコピーしてから投稿画面を開き、Ctrl+V で貼ってもらう
+        どちらもできなければ：絵を置いた「読書の記録ページ」（/s/{id}）のリンクを付ける（X がリンクから絵を出す）
    ⚠️ 絵に名前は入れない（ほかの人も写るため）。書名と時間と場所だけ */
 let 読み終えの絵 = null, 読み終えの中身 = null;
 
@@ -639,7 +671,7 @@ function 読み終える窓(){
   共有の絵を描く(題, 分, 場所).then(絵=>{
     読み終えの絵 = 絵;
     const 見本 = document.getElementById("共有の見本");
-    if(見本) 見本.innerHTML = `<img src="${URL.createObjectURL(絵)}" alt="投稿する絵">`;
+    if(見本) 見本.innerHTML = `<img src="${URL.createObjectURL(絵.jpeg)}" alt="投稿する絵">`;
   }).catch(e=>{
     console.error(e);
     const 見本 = document.getElementById("共有の見本");
@@ -736,7 +768,10 @@ async function 共有の絵を描く(題, 分, 場所){
   g.font = '600 18px "Hiragino Sans","Yu Gothic UI","Yu Gothic",sans-serif';
   g.fillText("GEMuの静かな読書会", W - 40, 110);
 
-  return new Promise((ok, ng)=>c.toBlob(b=>b ? ok(b) : ng(new Error("書き出せませんでした")), "image/jpeg", .9));
+  // JPEG は記録ページに置く用、PNG は貼り付け・共有用（クリップボードは PNG しか受け付けない）
+  const 書き出す = 型 => new Promise((ok, ng)=>c.toBlob(b=>b ? ok(b) : ng(new Error("書き出せませんでした")), 型, .9));
+  const [jpeg, png] = await Promise.all([書き出す("image/jpeg"), 書き出す("image/png")]);
+  return { jpeg, png };
 }
 
 document.addEventListener("click", e=>{
