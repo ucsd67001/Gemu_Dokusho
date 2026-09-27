@@ -71,7 +71,7 @@ img{max-width:100%;display:block}
   color:var(--字のごく薄い);border-left:1px solid var(--罫);padding-left:14px;white-space:nowrap}
 
 .帯 nav{display:flex;gap:22px;margin-left:auto;align-items:center}
-.帯 nav button{font-family:var(--ゴシック);font-size:12.5px;letter-spacing:.05em;
+.帯 nav button{font-family:var(--ゴシック);font-size:12.5px;letter-spacing:.05em;white-space:nowrap;
   color:var(--字の薄い);padding:20px 0 19px;border-bottom:1px solid transparent;transition:.15s}
 .帯 nav button:hover{color:var(--字)}
 .帯 nav button.いま{color:var(--字);border-bottom-color:var(--字)}
@@ -179,7 +179,8 @@ h2.節見出し{font-size:17px;font-weight:600;letter-spacing:.09em;margin:0}
 
 /* ── 部屋（舞台） ───────────────────────────
    座標は部屋.js の席（絵の上の %）。人の足もとを席の点に合わせる */
-.舞台{position:relative;width:100%;aspect-ratio:16/10;overflow:hidden;
+/* ⚠️ overflow は見せる。背景の絵は舞台と同じ縦横比なので、はみ出すのは名札だけ（スマホで2段目の名札が切れた） */
+.舞台{position:relative;width:100%;aspect-ratio:16/10;overflow:visible;
   background:#efe7da;border:1px solid var(--罫);border-radius:2px;
   container-type:inline-size}
 .舞台 > img.背景{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
@@ -199,21 +200,22 @@ h2.節見出し{font-size:17px;font-weight:600;letter-spacing:.09em;margin:0}
 .名の札{position:absolute;transform:translate(-50%,4px);z-index:5;
   background:rgba(255,253,255,.92);border:1px solid var(--罫の濃い);border-radius:2px;
   padding:.35cqi .9cqi .4cqi;white-space:nowrap;text-align:center;line-height:1.45;
-  max-width:24cqi}
+  max-width:12cqi}
 .名の札 b{display:block;font-family:var(--ゴシック);font-size:max(10px,1.05cqi);
   letter-spacing:.06em;font-weight:600;color:var(--字)}
 .名の札 span{display:block;font-family:var(--明朝);font-size:max(10px,1.05cqi);
   color:var(--字の薄い);overflow:hidden;text-overflow:ellipsis}
 .名の札.自分{border-color:var(--灯)}
-/* 二人掛けのベンチに2人いるときは、名札を左右に振り分ける（真ん中のままだと重なる。
-   下にずらすと、手前のベンチで舞台からはみ出した） */
-.名の札.寄せ左{transform:translate(calc(-100% + 6px),4px)}
-.名の札.寄せ右{transform:translate(-6px,4px)}
+/* 二人掛けのベンチに2人いるときは、2人目の名札を1段下げる。
+   ⚠️ 左右に振り分けると、ベンチを横一列に並べたとき（2026-09-27）隣のブロックの名札とぶつかった。
+   ⚠️ 名札の幅は、ブロックの間（舞台の16%ほど）に収まるように 12cqi まで。長い題は … で切り、全文は title と舞台の下の一覧で */
+.名の札.下段{transform:translate(-50%,calc(100% + 8px))}
+.名の札 b{overflow:hidden;text-overflow:ellipsis}
 /* 舞台が狭い（スマホ）ときは、字を小さくして、長い題は … で切る。
    ⚠️ 前は書名を隠していた（名札が重なるので）。**配信者から「スマホで本の題が出ない」**（2026-09-27）。
       何を読んでいるかが見えることが、この場所の肝なので、隠さない */
 @container (max-width:560px){
-  .名の札{padding:1px 5px 2px;max-width:27cqi}
+  .名の札{padding:1px 4px 2px;max-width:14cqi}
   .名の札 b,.名の札 span{font-size:9px;letter-spacing:.02em}
 }
 
@@ -285,13 +287,18 @@ h2.節見出し{font-size:17px;font-weight:600;letter-spacing:.09em;margin:0}
 
 /* ── 狭い画面 ─────────────────────────── */
 @media (max-width:640px){
-  .帯 .中{gap:14px}
+  .帯 .中{gap:12px}
+  /* 「GEMuの静かな読書会」は長いので、狭い画面では字を詰める（メニューが縦に折れた） */
+  .銘{font-size:15px;letter-spacing:.04em}
+  .銘 .粒{margin-right:6px}
+  /* 2段目の名札は舞台の下へはみ出す。下の段とぶつからないように余白を取る */
+  #舞台{margin-bottom:34px}
   .試用札{display:none}
-  .帯 nav{gap:16px}
+  .帯 nav{gap:12px}
   .部屋の札{grid-template-columns:1fr;gap:12px}
   .記録{grid-template-columns:1fr auto;gap:4px 12px}
   .記録 .日{grid-column:1 / -1}
-  .名の札{max-width:30cqi}
+  .名の札{max-width:14cqi}
   .三枚{grid-template-columns:repeat(2,minmax(0,1fr))}
   .数字{padding:14px 10px 15px}
   .数字 .値{font-size:21px}
