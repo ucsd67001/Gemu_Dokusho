@@ -1,8 +1,10 @@
 /* ============================================================
-   GEMu 読書会 ― 画面
+   GEMuの静かな読書会 ― 画面
 
    流れ：入口（Googleで入る）→ 名前と写真 → アバターができるのを待つ → できあがり
-         → 廊下（部屋の一覧。いまはカフェだけ）→ カフェの席に着く（読む本の題を入れる）
+         → 廊下（場所の一覧）→ 場所のベンチに座る（読む本の題を入れる）
+   ⚠️ 画面の中の名前は「部屋」のまま（コードの名前）。利用者に見せる言葉は「場所」。
+      2026-09-27 に、神保町のカフェから「世界の、読書が気持ちよさそうな観光地」へ変えた（最初はローテンブルク）
 
    ⚠️ Firebase には直接さわらない。**土台.js（試しでは 試し/土台.js）だけを通す。**
    ⚠️ 押せるものは onclick に値を書かず、data-する="…" と data-* で渡す。
@@ -10,7 +12,7 @@
       （Hongaeshi で実際に穴だった）。
    ============================================================ */
 
-import { 部屋ら, 部屋の絵 } from "./部屋.js";
+import { 部屋ら, 部屋の絵, 出す部屋ら, 最初の部屋 } from "./部屋.js";
 
 const 試しか = location.pathname === "/demo" || location.pathname.startsWith("/demo/");
 const 土台 = await import(試しか ? "./試し/土台.js" : "./土台.js");
@@ -22,7 +24,7 @@ const 状態 = {
   自分:undefined,          // undefined＝読み込み中／null＝まだ名前が無い
   人々:new Map(),
   席ら:[],                 // いま見ている部屋の席
-  頁:"廊下", 部屋:"cafe",
+  頁:"廊下", 部屋:最初の部屋,
   作ったばかり:false,
   頼んでいる:false,         // 作る を押してから、裏の処理が返るまで
 };
@@ -74,18 +76,28 @@ function 分に(ms){
 }
 
 /* ── 頁の行き来 ─────────────────────────── */
-const 道の頁 = { "":"廊下", "/cafe":"部屋", "/log":"記録", "/me":"自分" };
-const 頁の道 = { 廊下:"", 部屋:"/cafe", 記録:"/log", 自分:"/me" };
+const 道の頁 = { "":"廊下", "/log":"記録", "/me":"自分" };
+const 頁の道 = { 廊下:"", 記録:"/log", 自分:"/me" };
+
+// /room/{部屋} で場所を開く。⚠️ /cafe は最初の形の名残り（カフェを開く）
+function 道を読む(){
+  const 道 = location.pathname.slice(根.length).replace(/\/$/, "");
+  const m = 道.match(/^\/room\/([a-z0-9-]+)$/) || (道 === "/cafe" ? [0, "cafe"] : null);
+  if(m && 部屋ら[m[1]]) return { 頁:"部屋", 部屋:m[1] };
+  return { 頁:道の頁[道] || "廊下" };
+}
 
 function 行く(頁, 履歴に積む = true){
   if(状態.頁 === "部屋" && 頁 !== "部屋") 土台.立つ().catch(()=>{});
   状態.頁 = 頁;
-  if(履歴に積む) history.pushState({}, "", 根 + (頁の道[頁] ?? "") || "/");
+  const 道 = 頁 === "部屋" ? `/room/${状態.部屋}` : (頁の道[頁] ?? "");
+  if(履歴に積む) history.pushState({}, "", 根 + 道 || "/");
   描く();
   scrollTo(0, 0);
 }
 addEventListener("popstate", ()=>{
-  const 頁 = 道の頁[location.pathname.slice(根.length).replace(/\/$/, "")] || "廊下";
+  const { 頁, 部屋 } = 道を読む();
+  if(部屋) 状態.部屋 = 部屋;
   行く(頁, false);
 });
 // タブを閉じるときに席を立つ（届かないこともある。そのときは3分で空き扱いになる）
@@ -122,7 +134,7 @@ function 描く(){
 function 帯を描く(){
   const 入った = 状態.私 && 状態.自分?.アバター?.座る;
   document.getElementById("nav").innerHTML = 入った ? [
-    ["廊下", "カフェ"], ["記録", "記録"], ["自分", "自分"],
+    ["廊下", "場所"], ["記録", "記録"], ["自分", "自分"],
   ].map(([頁, 字])=>`<button class="${状態.頁 === 頁 || (頁 === "廊下" && 状態.頁 === "部屋") ? "いま" : ""}"
       data-する="行く" data-頁="${頁}">${字}</button>`).join("") : "";
   const 右 = document.getElementById("帯の右");
@@ -138,14 +150,14 @@ const 待ちの画面 = 字 => `<div class="待つ"><div class="積み木">${"<i
 
 /* ── 入口 ─────────────────────────────── */
 function 入口(){
-  const 部屋 = 部屋ら.cafe;
+  const 部屋 = 部屋ら[最初の部屋];
   画面.innerHTML = `
-  <div class="看板"><div class="舞台" style="aspect-ratio:${部屋.比}"><img class="背景" src="${部屋の絵(部屋)}" alt="明るい中世のカフェの部屋"></div></div>
+  <div class="看板"><div class="舞台" style="aspect-ratio:${部屋.比}"><img class="背景" src="${部屋の絵(部屋)}" alt="${逃(部屋.名)}"></div></div>
   <section class="幕">
     <p class="英字の札">GEMu Dokusho</p>
-    <h1 class="大見出し">しずかに、同じ部屋で読む。</h1>
-    <p class="導き">神保町の喫茶店のように、だれも話さず、それぞれが自分の本を読んでいる。それなのに、同じ時間に本をひらいている人がいる。読書好きどうしの、ふしぎな一体感の場所です。</p>
-    <p class="導き" style="margin-top:10px">自分の姿をブロックの人にして、カフェの席に座ります。</p>
+    <h1 class="大見出し">家にいながら、<br>景色のいい場所で読む。</h1>
+    <p class="導き">誰にも邪魔されずに、ひとりで静かに本を読むのが好き。でも、景色のいいところで読むのにも、ちょっと憧れている。インドア派だから、なかなか行けないけれど。</p>
+    <p class="導き" style="margin-top:10px">ここでは、自分の姿をブロックにして、世界の、読書が気持ちよさそうな場所のベンチに座ります。話さなくていい。となりのベンチでも、だれかが自分の本を読んでいます。最初の場所は、ドイツのローテンブルクです。</p>
     <div class="釦たち" style="margin-top:30px">
       <button class="釦" data-する="入る">${試しか ? "試しに入る" : "Google で入る"}</button>
     </div>
@@ -178,7 +190,7 @@ function 登録(){
     <p class="英字の札">Welcome</p>
     <h1 class="中見出し">はじめまして</h1>
     <p class="導き">名前と写真を決めると、写真をもとに、ブロックの姿のアバターを作ります。</p>
-    <label class="名札" for="名の欄">名前（カフェで名札に出ます）</label>
+    <label class="名札" for="名の欄">名前（ベンチの名札に出ます）</label>
     <input id="名の欄" class="欄" maxlength="20" placeholder="例：しおり" value="${逃(状態.自分?.名 || "")}">
     ${写真の欄()}
     ${誤り ? `<p class="誤りの字">${逃(誤り)}</p>` : ""}
@@ -208,7 +220,7 @@ function できあがり(){
     <p class="導き">奥の席では顔が、手前の席では背中が見えます。ときどき、ページをめくります。</p>
     ${三枚(a)}
     <div class="釦たち" style="margin-top:30px">
-      <button class="釦" data-する="カフェへ">カフェへ</button>
+      <button class="釦" data-する="場所へ" data-部屋="${最初の部屋}">${逃(部屋ら[最初の部屋].名)}へ</button>
       <button class="釦 枠だけ" data-する="行く" data-頁="自分">作り直す</button>
     </div>
   </section>`;
@@ -228,14 +240,14 @@ const 三枚 = a => `<div class="三枚">
 function 廊下(){
   画面.innerHTML = `
   <section class="幕">
-    <p class="英字の札">Rooms</p>
-    <h1 class="中見出し">どの部屋で読みますか</h1>
+    <p class="英字の札">Places</p>
+    <h1 class="中見出し">どこで読みますか</h1>
   </section>
   <section class="節">
-    <div class="節の頭"><h2 class="節見出し">部屋</h2><p class="節の添え">いまはひとつだけ</p></div>
+    <div class="節の頭"><h2 class="節見出し">場所</h2><p class="節の添え">世界の、読書が気持ちよさそうな場所を増やしていきます</p></div>
     <div class="部屋の列">
-      ${Object.entries(部屋ら).map(([id, 部屋])=>`
-      <button class="部屋の札" data-する="カフェへ" data-部屋="${id}">
+      ${出す部屋ら().map(([id, 部屋])=>`
+      <button class="部屋の札" data-する="場所へ" data-部屋="${id}">
         <div class="小さな舞台"><div class="舞台" style="border:none;aspect-ratio:${部屋.比}"><img class="背景" src="${部屋の絵(部屋)}" alt=""></div></div>
         <div>
           <div class="部屋の名">${逃(部屋.名)}</div>
@@ -247,17 +259,20 @@ function 廊下(){
     </div>
   </section>`;
   // 誰がいるかを出す
-  片づけ.push(土台.席を見張る("cafe", 席ら=>{
-    const 数 = document.getElementById("居る数-cafe"), 列 = document.getElementById("顔の列-cafe");
-    if(!数) return;
-    数.textContent = 席ら.length ? `いま${席ら.length}人が読んでいます（${部屋ら.cafe.席.length}席）` : `いまは誰もいません（${部屋ら.cafe.席.length}席）`;
-    列.innerHTML = 席ら.map(s=>顔の絵(状態.人々.get(s.uid), "中")).join("");
-    絵を入れる(列);
-  }));
+  for(const [id, 部屋] of 出す部屋ら()){
+    片づけ.push(土台.席を見張る(id, 席ら=>{
+      const 数 = document.getElementById(`居る数-${id}`), 列 = document.getElementById(`顔の列-${id}`);
+      if(!数) return;
+      数.textContent = 席ら.length ? `いま${席ら.length}人が読んでいます（${部屋.席.length}席）` : `いまは誰もいません（${部屋.席.length}席）`;
+      列.innerHTML = 席ら.map(s=>顔の絵(状態.人々.get(s.uid), "中")).join("");
+      絵を入れる(列);
+    }));
+  }
 }
 
 /* ── 部屋 ─────────────────────────────── */
 function 部屋の頁(){
+  if(!部屋ら[状態.部屋]) 状態.部屋 = 最初の部屋;
   const 部屋 = 部屋ら[状態.部屋];
   画面.innerHTML = `
   <section class="幕" style="padding-top:34px">
@@ -279,7 +294,7 @@ function 部屋の頁(){
 
   // ときどきページをめくる
   const めくり = setInterval(()=>{
-    for(const el of document.querySelectorAll("#舞台 .人")){
+    for(const el of document.querySelectorAll("#舞台 .人:not(.空き)")){
       if(Math.random() < .28){
         el.classList.add("めくり中");
         setTimeout(()=>el.classList.remove("めくり中"), 1300);
@@ -302,8 +317,15 @@ function 部屋を描き直す(){
   const 並び = [...状態.席ら].sort((a, b)=>(部屋.席[a.番]?.y || 0) - (部屋.席[b.番]?.y || 0));
   const 背景 = 舞台.querySelector("img.背景").outerHTML;
   const 置き = (席, 幅) => `left:${席.x}%;top:${席.y}%${幅 ? `;width:${席.幅}%` : ""}`;
+  // 誰も座っていない席には、空のベンチを置く（場所に 空き の絵があるときだけ）。空きの絵は右向きで描いてある
+  const 座られた = new Set(状態.席ら.map(s=>s.番));
+  const 空きら = 部屋.空き ? 部屋.席.map((席, 番)=>({ 席, 番 })).filter(x=>!座られた.has(x.番)) : [];
+  const 空きの絵 = 空きら.map(({ 席 })=>`
+    <div class="人 空き ${席.向き === "左" ? "左向き" : ""}" style="${置き(席, true)}">
+      <div class="姿"><img class="座る" src="${部屋.空き[席.姿] || 部屋.空き.顔}" alt=""></div>
+    </div>`).join("");
   // ⚠️ 名札は人の絵と別の層にして、最後に重ねる。人の中に入れると、手前の人が奥の人の名札を隠す
-  舞台.innerHTML = 背景 + 並び.map(s=>{
+  舞台.innerHTML = 背景 + 空きの絵 + 並び.map(s=>{
     const 席 = 部屋.席[s.番];
     if(!席) return "";
     const 人 = 状態.人々.get(s.uid), a = 人?.アバター || {};
@@ -383,7 +405,7 @@ function 題の窓(やること){
   窓を出す(やること === "席に着く" ? "いま読む本" : "本を替える", `
     <label class="名札" for="題の欄">本の題</label>
     <input id="題の欄" class="欄" maxlength="120" placeholder="例：銀河鉄道の夜" value="${逃(前の題())}">
-    <p class="注">カフェの名札に出ます。</p>
+    <p class="注">ベンチの名札に出ます。</p>
     <div class="釦たち" style="margin-top:22px">
       <button class="釦 全幅" data-する="題を決める" data-やること="${逃(やること)}">${やること === "席に着く" ? "席に着く" : "替える"}</button>
     </div>`);
@@ -400,7 +422,7 @@ async function 記録の頁(){
   <section class="幕">
     <p class="英字の札">Reading log</p>
     <h1 class="中見出し">読んだ時間</h1>
-    <p class="導き">カフェの席に着いていた時間です。</p>
+    <p class="導き">ベンチに座っていた時間です。</p>
     <div id="記録の中">${待ちの画面("読みこんでいます")}</div>
   </section>`;
   let 記録;
@@ -434,7 +456,7 @@ async function 記録の頁(){
           <span class="日">${日付(r.始め)}</span>
           <span class="題">『${逃(r.題)}』</span>
           <span class="分">${分に(長さ(r))}</span></div>`).join("")
-          : `<p class="注">まだありません。カフェで席に着くと、ここに残ります。</p>`}
+          : `<p class="注">まだありません。ベンチに座ると、ここに残ります。</p>`}
       </div>
     </section>`;
 }
@@ -462,7 +484,7 @@ function 自分の頁(){
     <div class="釦たち" style="margin-top:16px">
       <button class="釦 枠だけ 小" data-する="向きを反対にする">向きを反対にする</button>
     </div>
-    <p class="注">カフェでは、テーブルの方を向いて座ります。奥の席で逆を向いていたら押してください。</p>
+    <p class="注">場所ごとに、決まった方を向いて座ります。奥の席で逆を向いていたら押してください。</p>
     ${a.背中 ? "" : `<div class="釦たち" style="margin-top:18px">
       <button class="釦 枠だけ 小" data-する="背中を足す">背中の姿を足す</button></div>
     <p class="注">手前の席では、テーブルに向かう背中が見えます。いまの姿から背中だけを描きます（1分ほど。1日の回数に1回数えます）。</p>`}
@@ -523,7 +545,7 @@ const 動き = {
   入る: ()=>土台.入る().catch(e=>知らせる("ログインできませんでした：" + (e.code || e.message), true)),
   出る: async ()=>{ await 土台.出る(); 状態.自分 = undefined; 行く("廊下"); },
   行く: el=>行く(el.dataset.頁),
-  カフェへ: ()=>{ 状態.部屋 = "cafe"; 行く("部屋"); },
+  場所へ: el=>{ 状態.部屋 = 部屋ら[el.dataset.部屋] ? el.dataset.部屋 : 最初の部屋; 行く("部屋"); },
   覆いの外: (el, e)=>{ if(e.target === el) 窓を閉じる(); },
   窓を閉じる,
   はじめて作る: ()=>{ const 名 = 名を読む(); if(名) 作る(名); },
@@ -564,7 +586,7 @@ const 動き = {
   席を立つ: async ()=>{ await 土台.立つ(); 行く("廊下"); },
   Xに投稿: ()=>{
     const 題 = 状態.席ら.find(s=>s.uid === 状態.私.uid)?.題 || 前の題();
-    const 文 = `いま『${題}』を読んでいます。\nGEMu 読書会のカフェにて\n#GEMu読書会`;
+    const 文 = `いま『${題}』を読んでいます。\nGEMuの静かな読書会の${部屋ら[状態.部屋].名}のベンチにて\n#GEMuの静かな読書会`;
     const url = "https://x.com/intent/post?text=" + encodeURIComponent(文)
       + (試しか ? "" : "&url=" + encodeURIComponent(location.origin));
     open(url, "_blank", "noopener");
@@ -590,8 +612,9 @@ document.addEventListener("change", async e=>{
 
 /* ── 立ち上げ ───────────────────────────── */
 {
-  const 頁 = 道の頁[location.pathname.slice(根.length).replace(/\/$/, "")];
-  if(頁) 状態.頁 = 頁;
+  const { 頁, 部屋 } = 道を読む();
+  状態.頁 = 頁;
+  if(部屋) 状態.部屋 = 部屋;
 }
 描く();
 土台.起動(({ 私 })=>{

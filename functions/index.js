@@ -1,5 +1,5 @@
 /* ============================================================
-   GEMu 読書会 ― 裏の処理
+   GEMuの静かな読書会 ― 裏の処理
 
    いまあるのは3つ：
      makeAvatar  写真から、ブロック風のアバターを4枚作る
@@ -17,7 +17,9 @@
    ⚠️ ②③④は、写真からではなく **①から作る。**写真から何回も作ると、
       別人になる（顔も服も毎回変わる）。
    ⚠️ 席は4つ。テーブルの左右×奥と手前。左右は反転で作れるので、要るのは「顔の向き」と「背中の向き」の2つだけ。
-   ⚠️ 椅子ごと描かせるのは、背景の椅子に重ねると、向きと高さがずれて浮いて見えるため。
+   ⚠️ 座るものごと描かせるのは、背景の椅子に重ねると、向きと高さがずれて浮いて見えるため。
+   ⚠️ 座るものは**小さな木のベンチ**（2026-09-27、カフェの椅子から替えた）。場所が観光地の広場・公園・川べりに
+      なっても合うように。空いている席に置く空のベンチ（04_tools/部屋を作る.mjs bench）と、言い方をそろえる
    ⚠️⚠️ **「右前を向く」と頼んでも、左を向いて描かれることがある**（2026-09-27、配信者の一枚目がそうだった）。
       → 描いたあとに、左右どちらを向いているかを見る（avatar.facing＝"left"/"right"）。
         部屋では、席の「テーブルの方向」と違えば左右を反転する。見分けを間違えたら、本人が「自分」で反対にできる（users.flip）。
@@ -61,6 +63,9 @@ const 画風 =
   "isometric three-quarter view from slightly above, the character faces toward the front-right. " +
   "Fully transparent background. No text, no floor, no shadow on the ground, no other objects.";
 
+const ベンチ =
+  "a small wooden park bench with a backrest and simple dark iron legs, just wide enough for one person";
+
 const 座る指示 =
   "Turn the main subject of this image into a single character in " + 画風 + " " +
   "The subject may be a real person, an illustrated character, a mascot, an animal or a creature. " +
@@ -71,11 +76,11 @@ const 座る指示 =
   "a tail made of blocks). " +
   "If it is a person, keep hair style and color, skin tone, glasses if any, and clothing colors. " +
   "If it is not a human, do NOT turn it into a human; keep it the same kind of character, just made of blocks. " +
-  "The character sits on a small medieval wooden chair (the chair is part of the image), " +
-  "holding an open book and reading it calmly. The whole chair and body fit inside the image.";
+  "The character sits on " + ベンチ + " (the bench is part of the image), " +
+  "holding an open book and reading it calmly. The whole bench and body fit inside the image.";
 
 const めくる指示 =
-  "Keep this exact same character, chair, pose, camera angle, size and position. " +
+  "Keep this exact same character, bench, pose, camera angle, size and position. " +
   "Change only one thing: one hand is turning a page of the open book (a page lifted in mid-turn). " +
   "Fully transparent background. No text.";
 
@@ -83,12 +88,12 @@ const 顔の指示 =
   "Using this exact same character, make a square portrait icon: only its face and the top of its body " +
   "(head and shoulders if it has them), facing the front, centered, filling most of the image. " +
   "Same shape, pixel textures and colors, and keep items on its head. " +
-  "Fully transparent background. No book, no chair, no text.";
+  "Fully transparent background. No book, no bench, no text.";
 
 const 背中の指示 =
   "Keep this exact same character: same blocky body, same hair, same clothes and colors, same ears or tail if any, " +
-  "same chair, same size. " +
-  "Now show it from BEHIND: the camera looks at the character's back and the back of the chair. " +
+  "same bench, same size. " +
+  "Now show it from BEHIND: the camera looks at the character's back and the back of the bench. " +
   "The character sits facing away from the viewer, turned toward the upper-right (back-right) of the image, " +
   "reading a book held in front of them (the book is mostly hidden by the body). " +
   "Isometric three-quarter view from slightly above, like the original. " +
@@ -229,7 +234,7 @@ async function 向きを見る(ai, 絵, 型){
       max_tokens: 3,
       messages: [{ role: "user", content: [
         { type: "text", text:
-          "This image shows a blocky character sitting on a chair. From the viewer's point of view, " +
+          "This image shows a blocky character sitting on a bench or chair. From the viewer's point of view, " +
           "is the character's face and body turned toward the LEFT side or the RIGHT side of the image? " +
           "Answer with exactly one word: left or right." },
         { type: "image_url", image_url: { url: `data:${型};base64,${絵.toString("base64")}`, detail: "low" } },
@@ -250,7 +255,7 @@ async function 背中の向きを見る(ai, 絵, 型){
       max_tokens: 3,
       messages: [{ role: "user", content: [
         { type: "text", text:
-          "This image shows a blocky character sitting on a chair, seen from behind (facing away from the viewer). " +
+          "This image shows a blocky character sitting on a bench or chair, seen from behind (facing away from the viewer). " +
           "Is the character facing toward the upper-LEFT or the upper-RIGHT of the image? " +
           "Answer with exactly one word: left or right." },
         { type: "image_url", image_url: { url: `data:${型};base64,${絵.toString("base64")}`, detail: "low" } },

@@ -1,5 +1,5 @@
 /* ============================================================
-   GEMu 読書会 ― 見た目
+   GEMuの静かな読書会 ― 見た目
 
    ⚠️ **本返し（Hongaeshi）の決まりをそのまま受け継いでいる。**
       ・構造は**罫（1px）でつくる。**影と角丸に頼らない
@@ -190,6 +190,8 @@ h2.節見出し{font-size:17px;font-weight:600;letter-spacing:.09em;margin:0}
 .人.めくり中 .姿 img.めくる{opacity:1}
 .人.めくり中 .姿 img.座る{opacity:0}
 .人.左向き .姿{transform:scaleX(-1)}
+/* 空のベンチは息をしない */
+.人.空き .姿{animation:none}
 @keyframes 息{0%,100%{translate:0 0}50%{translate:0 -0.6%}}
 
 /* 名札。紙の札を1枚、足もとに置く。
@@ -203,8 +205,13 @@ h2.節見出し{font-size:17px;font-weight:600;letter-spacing:.09em;margin:0}
 .名の札 span{display:block;font-family:var(--明朝);font-size:max(10px,1.05cqi);
   color:var(--字の薄い);overflow:hidden;text-overflow:ellipsis}
 .名の札.自分{border-color:var(--灯)}
-/* 舞台が狭い（スマホ）ときは名前だけにする。書名は舞台の下の一覧に出ている */
-@container (max-width:560px){ .名の札 span{display:none} }
+/* 舞台が狭い（スマホ）ときは、字を小さくして、長い題は … で切る。
+   ⚠️ 前は書名を隠していた（名札が重なるので）。**配信者から「スマホで本の題が出ない」**（2026-09-27）。
+      何を読んでいるかが見えることが、この場所の肝なので、隠さない */
+@container (max-width:560px){
+  .名の札{padding:1px 5px 2px;max-width:27cqi}
+  .名の札 b,.名の札 span{font-size:9px;letter-spacing:.02em}
+}
 
 /* 部屋の気配の一行。舞台の上に、小さく */
 .気配{margin:0 0 12px;font-size:14px;color:var(--字の薄い);letter-spacing:.06em;min-height:1.95em}
