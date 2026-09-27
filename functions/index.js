@@ -310,12 +310,13 @@ export const sharePage = onRequest({ region: "asia-northeast1" }, async (req, re
 <meta name="description" content="${逃(説明)}">
 <meta property="og:type" content="article">
 <meta property="og:url" content="${逃(ここ)}">
-<meta property="og:title" content="${逃(題)}">
+<!-- ⚠️ X は og:title を絵の下に黒い帯で重ねて出す（消せない）。書名と時間は絵と本文に入っているので、題名は短く（2026-09-27 配信者） -->
+<meta property="og:title" content="GEMuの静かな読書会">
 <meta property="og:description" content="${逃(説明)}">
 <meta property="og:image" content="${逃(d.image)}">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="${逃(題)}">
+<meta name="twitter:title" content="GEMuの静かな読書会">
 <meta name="twitter:description" content="${逃(説明)}">
 <meta name="twitter:image" content="${逃(d.image)}">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">

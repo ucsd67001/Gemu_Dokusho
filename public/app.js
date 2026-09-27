@@ -763,6 +763,32 @@ async function 共有の絵を描く(題, 分, 場所){
     g.restore();
   }
 
+  // 自分の名札（名前と『題』）を、自分の足もとに。⚠️ ほかの人の名前は入れない（2026-09-27 配信者：自分の名前と題を出したい）
+  const 自分の席 = 状態.席ら.find(s=>s.uid === 状態.私.uid);
+  if(自分の席 && 部屋.席[自分の席.番]){
+    const 席 = 部屋.席[自分の席.番];
+    const 中 = W * 席.x / 100, 上 = ずらし + 高さ * 席.y / 100 + 6;
+    const 名 = 状態.自分?.名 || "";
+    g.font = '600 17px "Hiragino Sans","Yu Gothic UI","Yu Gothic",sans-serif';
+    const 名の幅 = Math.min(g.measureText(名).width, 260);
+    g.font = '400 17px "Zen Old Mincho", serif';
+    const 題の文 = 詰める(g, `『${題}』`, 260);
+    const 幅 = Math.max(名の幅, g.measureText(題の文).width) + 24, 丈 = 56;
+    const 左 = Math.max(8, Math.min(W - 幅 - 8, 中 - 幅 / 2));
+    g.fillStyle = "rgba(255,253,255,.94)";
+    g.fillRect(左, 上, 幅, 丈);
+    g.strokeStyle = "#6b4bc4";
+    g.lineWidth = 1.5;
+    g.strokeRect(左 + .75, 上 + .75, 幅 - 1.5, 丈 - 1.5);
+    g.textAlign = "center";
+    g.fillStyle = "#17141f";
+    g.font = '600 17px "Hiragino Sans","Yu Gothic UI","Yu Gothic",sans-serif';
+    g.fillText(名, 左 + 幅 / 2, 上 + 23, 260);
+    g.fillStyle = "#59526b";
+    g.font = '400 17px "Zen Old Mincho", serif';
+    g.fillText(題の文, 左 + 幅 / 2, 上 + 46);
+  }
+
   // 上の紙の帯
   g.fillStyle = "rgba(255,253,255,.92)";
   g.fillRect(0, 0, W, 132);
