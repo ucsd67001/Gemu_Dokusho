@@ -16,6 +16,13 @@
         "destination": "/demo.html"
       },
       {
+        "source": "/s/**",
+        "function": {
+          "functionId": "sharePage",
+          "region": "asia-northeast1"
+        }
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

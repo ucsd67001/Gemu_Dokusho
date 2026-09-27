@@ -3,7 +3,8 @@ rules_version = '2';
 /* ============================================================
    GEMu 読書会 ― Storage のきまり
 
-   ⚠️ 置くのは**出来上がったアバターの絵だけ。**書くのは裏の処理（functions）だけ。
+   ⚠️ 置くのは**出来上がったアバターの絵**（書くのは functions だけ）と、
+      **X に投稿する読書の絵**（shares/{uid}/。本人が画面から書く。X が読むので、だれでも読める）。
    ⚠️⚠️ **元の写真は置かない。**アバターを作るために OpenAI へ送るだけで、どこにも残さない。
    ⚠️ 読めるのはログインしたひとだけ。
    ============================================================ */
@@ -12,6 +13,12 @@ service firebase.storage {
     match /avatars/{uid}/{rest=**} {
       allow read: if request.auth != null;
       allow write: if false;
+    }
+    match /shares/{uid}/{file} {
+      allow read: if true;
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png)');
     }
     match /{rest=**} { allow read, write: if false; }
   }

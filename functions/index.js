@@ -11,6 +11,8 @@
      addBack     ④が無いアバター（④を足す前に作ったもの）に、④だけを足す
      detectFacing  できているアバター（座る姿）が、左右どちらを向いているかを見て記録する
                    （向きを記録する前に作ったアバターのため。画面が一度だけ呼ぶ）
+     borrowImages  アバターの絵を data URL で返す（読み終えたときの X 用の絵を、画面の canvas で描くため）
+     sharePage     読書の記録ページ /s/{id}。X がリンクから絵（og:image）を読み取って、投稿に大きく出す
 
    ⚠️⚠️ **写真はどこにも残さない。**受け取って OpenAI に渡すだけ。
       残すのは出来上がった絵（Storage の avatars/{uid}/{版}/）だけ。
@@ -29,7 +31,7 @@
 
    鍵：OPENAI_API_KEY は Secret Manager に置く（README「鍵」）。
    ============================================================ */
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
@@ -60,7 +62,9 @@ const 写真の上限 = 6 * 1024 * 1024;   // 画面で 1024px の JPEG に縮�
 const 画風 =
   "Blocky voxel style in the style of Minecraft: built from cubes, with flat pixel-art textures, simple and cute. " +
   "Clean 3D render, soft even lighting, " +
-  "isometric three-quarter view from slightly above, the character faces toward the front-right. " +
+  "isometric view from slightly above. The character and its seat are turned 45 degrees: " +
+  "it faces DIAGONALLY toward the lower-right corner of the image, not straight at the viewer " +
+  "(we see its face and front in three-quarter view, and its left side). " +
   "Fully transparent background. No text, no floor, no shadow on the ground, no other objects.";
 
 const ベンチ =
@@ -94,7 +98,8 @@ const 背中の指示 =
   "Keep this exact same character: same blocky body, same hair, same clothes and colors, same ears or tail if any, " +
   "same bench, same size. " +
   "Now show it from BEHIND: the camera looks at the character's back and the back of the bench. " +
-  "The character sits facing away from the viewer, turned toward the upper-right (back-right) of the image, " +
+  "The character sits facing away from the viewer, turned 45 degrees DIAGONALLY toward the upper-right corner of the image " +
+  "(we see its back in three-quarter view, and its left side), " +
   "reading a book held in front of them (the book is mostly hidden by the body). " +
   "Isometric three-quarter view from slightly above, like the original. " +
   "Fully transparent background. No text, no floor, no other objects.";
@@ -267,6 +272,59 @@ async function 背中の向きを見る(ai, 絵, 型){
     return "right";
   }
 }
+
+/* ── X に投稿する絵のため ─────────────────────────
+   ⚠️ Storage の絵を画面の canvas に描くと、別の場所（firebasestorage）の絵なので canvas が「汚れ」、
+      書き出せなくなる（バケットの CORS を開ければ済むが、その設定を持ち込みたくない）。
+      → 裏の処理が読んで data URL で返す。**アバターの絵だけ**（avatars/ の下の決まった名前だけ）、一度に12枚まで */
+export const borrowImages = onCall({ region: "asia-northeast1" }, async req => {
+  if(!req.auth) throw new HttpsError("unauthenticated", "ログインしてください");
+  const 道ら = Array.isArray(req.data?.paths) ? [...new Set(req.data.paths)].slice(0, 12) : [];
+  const 形 = /^avatars\/[A-Za-z0-9_-]+\/[a-z0-9]+\/(sit|turn|back|face)\.webp$/;
+  const 返す = {};
+  await Promise.all(道ら.filter(d => 形.test(d)).map(async 道 => {
+    try{
+      const [buf] = await getStorage().bucket().file(道).download();
+      返す[道] = "data:image/webp;base64," + buf.toString("base64");
+    }catch(e){ /* 消えた版など。描かないだけ */ }
+  }));
+  return { images: 返す };
+});
+
+/* 読書の記録ページ。firebase.json の rewrites で /s/** がここに来る。
+   ⚠️ 中身は shares/{id}（画面が書く）。絵は Storage の shares/{uid}/{id}.jpg（だれでも読める）。
+   ⚠️ 人が開いたら、そのまま絵と一言を出し、トップへの道を置く */
+export const sharePage = onRequest({ region: "asia-northeast1" }, async (req, res) => {
+  const id = (req.path.match(/^\/s\/([A-Za-z0-9]{10,40})\/?$/) || [])[1];
+  const d = id ? (await db.doc(`shares/${id}`).get()).data() : null;
+  if(!d){ res.redirect(302, "/"); return; }
+  const 逃 = t => String(t ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+  const 題 = `『${d.title}』を${d.minutes}分、${d.place}のベンチで読みました`;
+  const 説明 = "家にいながら、景色のいい場所で読む。GEMuの静かな読書会";
+  // Hosting から回ってくると、hostname は裏の処理の名前になる。元の名前は x-forwarded-host
+  const ここ = `https://${req.get("x-forwarded-host") || req.hostname}/s/${id}`;
+  res.set("Cache-Control", "public, max-age=300, s-maxage=86400");
+  res.send(`<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${逃(題)} ― GEMuの静かな読書会</title>
+<meta name="description" content="${逃(説明)}">
+<meta property="og:type" content="article">
+<meta property="og:url" content="${逃(ここ)}">
+<meta property="og:title" content="${逃(題)}">
+<meta property="og:description" content="${逃(説明)}">
+<meta property="og:image" content="${逃(d.image)}">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${逃(題)}">
+<meta name="twitter:description" content="${逃(説明)}">
+<meta name="twitter:image" content="${逃(d.image)}">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>body{margin:0;background:#f8f6fc;color:#17141f;font-family:"Hiragino Mincho ProN","Yu Mincho",serif;line-height:1.9}
+main{width:min(1080px,100% - 32px);margin:40px auto}img{width:100%;border:1px solid rgba(38,28,66,.13);border-radius:2px}
+p{margin:18px 0 0}a{color:#513397}</style></head>
+<body><main><img src="${逃(d.image)}" alt="${逃(題)}"><p>${逃(題)}</p>
+<p><a href="/">GEMuの静かな読書会</a> ― 家にいながら、景色のいい場所で読む。</p></main></body></html>`);
+});
 
 /* ── 道具 ─────────────────────────────── */
 function 写真をほどく(dataUrl){

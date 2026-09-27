@@ -24,7 +24,7 @@ import {
   getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, collection,
   query, where, orderBy, limit, onSnapshot, runTransaction, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { getStorage, ref as 置き場, getDownloadURL }
+import { getStorage, ref as 置き場, getDownloadURL, uploadBytes }
   from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
 import { getFunctions, httpsCallable }
   from "https://www.gstatic.com/firebasejs/10.14.1/firebase-functions.js";
@@ -208,6 +208,24 @@ export async function 立つ(){
 }
 
 export const 座っている = () => いま ? { ...いま } : null;
+
+/* ── X に投稿する ─────────────────────────────
+   読み終えたときの絵は、画面の canvas で描く（字は画面のフォントで描けるため）。
+   ⚠️ Storage の絵をそのまま canvas に描くと書き出せなくなる（別の場所の絵なので）。裏の処理から data URL で借りる */
+export async function 絵を借りる(道ら){
+  const r = await httpsCallable(呼ぶ, "borrowImages", { timeout: 30000 })({ paths:道ら.filter(Boolean) });
+  return r.data?.images || {};
+}
+
+// 絵（Blob）を置き、記録を作って、記録ページの URL を返す。X はこのページから絵を読み取る
+export async function 共有を作る(絵, { 題, 分, 場所 }){
+  const 記録 = doc(collection(db, "shares"));
+  const 道 = 置き場(倉, `shares/${私.uid}/${記録.id}.jpg`);
+  await uploadBytes(道, 絵, { contentType:"image/jpeg", cacheControl:"public, max-age=31536000" });
+  const image = await getDownloadURL(道);
+  await setDoc(記録, { uid:私.uid, title:題, minutes:分, place:場所, image, created:serverTimestamp() });
+  return `${location.origin}/s/${記録.id}`;
+}
 
 /* ── 記録 ─────────────────────────────── */
 export async function 記録を読む(){

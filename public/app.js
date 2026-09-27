@@ -397,8 +397,7 @@ function 手もとを描く(){
       <div class="時">読みはじめて ${分に(Date.now() - 席.入った)}</div></div>
     <div class="釦たち">
       <button class="釦 枠だけ 小" data-する="本を替える">本を替える</button>
-      <button class="釦 枠だけ 小" data-する="Xに投稿">X に投稿</button>
-      <button class="釦 小" data-する="席を立つ">席を立つ</button>
+      <button class="釦 小" data-する="読み終える">読み終える</button>
     </div></div>`;
   絵を入れる(el);
 }
@@ -587,15 +586,153 @@ const 動き = {
       知らせる(e.message === "満席です" ? "満席です。少し待ってから入ってください" : "席に着けませんでした", true);
     }
   },
-  席を立つ: async ()=>{ await 土台.立つ(); 行く("廊下"); },
-  Xに投稿: ()=>{
-    const 題 = 状態.席ら.find(s=>s.uid === 状態.私.uid)?.題 || 前の題();
-    const 文 = `いま『${題}』を読んでいます。\nGEMuの静かな読書会の${部屋ら[状態.部屋].名}のベンチにて\n#GEMuの静かな読書会`;
-    const url = "https://x.com/intent/post?text=" + encodeURIComponent(文)
-      + (試しか ? "" : "&url=" + encodeURIComponent(location.origin));
-    open(url, "_blank", "noopener");
+  読み終える: ()=>読み終える窓(),
+  そのまま終える: ()=>終える(),
+  投稿して終える: async el=>{
+    el.disabled = true;
+    el.textContent = "投稿の準備をしています…";
+    // ⚠️ 窓は押した瞬間に開く。絵を置き終わってから開くと、ポップアップとして止められる
+    const 窓 = open("", "_blank");
+    const { 題, 分, 場所 } = 読み終えの中身;
+    let 行き先 = location.origin + 根;
+    try{ if(読み終えの絵) 行き先 = await 土台.共有を作る(読み終えの絵, { 題, 分, 場所 }); }
+    catch(e){ console.error(e); 知らせる("絵を置けませんでした。文だけで投稿します", true); }
+    const 文 = `『${題}』を${分}分、${場所}のベンチで読みました。\n#GEMuの静かな読書会`;
+    const 先 = "https://x.com/intent/post?text=" + encodeURIComponent(文) + "&url=" + encodeURIComponent(行き先);
+    if(窓){ 窓.opener = null; 窓.location.href = 先; }
+    else open(先, "_blank", "noopener");
+    await 終える();
   },
 };
+
+/* ── 読み終える ─────────────────────────────
+   2026-09-27 配信者：X への投稿は、読み終えるときに「投稿しますか？」と聞き、
+   はいなら、絵・書名・読んだ時間と一緒に投稿する。
+   ⚠️ X の投稿画面を開く形（intent）では、画像を添付できない。
+      → 絵を置いた「読書の記録ページ」（/s/{id}。functions の sharePage）のリンクを付ける。
+        X がリンクから絵（og:image）を読み取り、投稿に大きく出す
+   ⚠️ 絵に名前は入れない（ほかの人も写るため）。書名と時間と場所だけ */
+let 読み終えの絵 = null, 読み終えの中身 = null;
+
+function 読み終える窓(){
+  const 席 = 土台.座っている();
+  if(!席) return 終える();
+  const 題 = 状態.席ら.find(s=>s.uid === 状態.私.uid)?.題 || 前の題();
+  const 分 = Math.max(1, Math.round((Date.now() - 席.入った) / 60000));
+  const 場所 = 部屋ら[状態.部屋].名;
+  読み終えの絵 = null;
+  読み終えの中身 = { 題, 分, 場所 };
+  窓を出す("読み終える", `
+    <p class="窓の文">『${逃(題)}』を、${逃(場所)}のベンチで <b>${分}分</b> 読みました。</p>
+    <div class="共有の見本" id="共有の見本">${待ちの画面("絵を描いています")}</div>
+    <p class="窓の文">X に投稿しますか？</p>
+    <div class="釦たち" style="margin-top:12px">
+      <button class="釦 藤" data-する="投稿して終える" disabled>X に投稿して終える</button>
+      <button class="釦 枠だけ" data-する="そのまま終える">投稿しないで終える</button>
+    </div>
+    <p class="注">投稿には、この絵と、書名と、読んだ時間が入ります。名前は入りません。</p>`);
+  共有の絵を描く(題, 分, 場所).then(絵=>{
+    読み終えの絵 = 絵;
+    const 見本 = document.getElementById("共有の見本");
+    if(見本) 見本.innerHTML = `<img src="${URL.createObjectURL(絵)}" alt="投稿する絵">`;
+  }).catch(e=>{
+    console.error(e);
+    const 見本 = document.getElementById("共有の見本");
+    if(見本) 見本.innerHTML = `<p class="注">絵を描けませんでした。文だけで投稿できます。</p>`;
+  }).finally(()=>{
+    const 釦 = document.querySelector("[data-する=投稿して終える]");
+    if(釦) 釦.disabled = false;
+  });
+}
+
+async function 終える(){
+  窓を閉じる();
+  await 土台.立つ().catch(()=>{});
+  行く("廊下");
+  知らせる("おつかれさまでした");
+}
+
+const 絵を読む = src => new Promise((ok, ng)=>{
+  const 絵 = new Image();
+  絵.onload = ()=>ok(絵);
+  絵.onerror = ng;
+  絵.src = src;
+});
+
+// 長い題は … で切る（『』は残す）
+function 詰める(g, 文, 幅){
+  if(g.measureText(文).width <= 幅) return 文;
+  let t = 文;
+  while(t.length > 2 && g.measureText(t + "…』").width > 幅) t = t.slice(0, -1);
+  return t + "…』";
+}
+
+/* X に載る絵（1200×630。X の大きな画像の形）。場所の絵に、いま座っている人と空のベンチを描き、
+   上に紙の帯を敷いて、書名・場所・時間を書く。
+   ⚠️ 場所の絵と空のベンチは同じ場所（Hosting）なので、そのまま canvas に描ける。
+      アバターは Storage にあるので、裏の処理から data URL で借りる（土台.絵を借りる） */
+async function 共有の絵を描く(題, 分, 場所){
+  const 部屋 = 部屋ら[状態.部屋];
+  const W = 1200, H = 630;
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const g = c.getContext("2d");
+  await Promise.all([
+    document.fonts.load('600 42px "Zen Old Mincho"'),
+    document.fonts.load('400 24px "Zen Old Mincho"'),
+  ]).catch(()=>{});
+
+  const 背景 = await 絵を読む(部屋の絵(部屋));
+  const 高さ = W * 背景.naturalHeight / 背景.naturalWidth;
+  const ずらし = -(高さ - H) * 0.6;   // 上を少し切る（帯の下に、ベンチが来るように）
+  g.fillStyle = "#f3e7d3";
+  g.fillRect(0, 0, W, H);
+  g.drawImage(背景, 0, ずらし, W, 高さ);
+
+  const 座られた = new Map(状態.席ら.map(s=>[s.番, s]));
+  const 描くもの = 部屋.席.map((席, 番)=>{
+    const s = 座られた.get(番);
+    if(s){
+      const 人 = 状態.人々.get(s.uid), a = 人?.アバター || {};
+      const 背中 = 席.姿 === "背中" && !!a.背中;
+      return { 席, 道:背中 ? a.背中 : a.座る, 反転:反転するか(人, 席, 背中) };
+    }
+    if(部屋.空き) return { 席, src:部屋.空き[席.姿] || 部屋.空き.顔, 反転:席.向き === "左" };
+    return null;
+  }).filter(Boolean).sort((a, b)=>a.席.y - b.席.y);
+  const 借りた = await 土台.絵を借りる(描くもの.map(x=>x.道).filter(Boolean)).catch(()=>({}));
+  for(const x of 描くもの){
+    const src = x.道 ? 借りた[x.道] : x.src;
+    if(!src) continue;
+    const 絵 = await 絵を読む(src).catch(()=>null);
+    if(!絵) continue;
+    const w = W * x.席.幅 / 100, 中 = W * x.席.x / 100, 足 = ずらし + 高さ * x.席.y / 100;
+    g.save();
+    g.translate(中, 足 - w);
+    if(x.反転) g.scale(-1, 1);
+    g.drawImage(絵, -w / 2, 0, w, w);
+    g.restore();
+  }
+
+  // 上の紙の帯
+  g.fillStyle = "rgba(255,253,255,.92)";
+  g.fillRect(0, 0, W, 132);
+  g.fillStyle = "rgba(38,28,66,.13)";
+  g.fillRect(0, 132, W, 1);
+  g.textAlign = "left";
+  g.fillStyle = "#17141f";
+  g.font = '600 42px "Zen Old Mincho", serif';
+  g.fillText(詰める(g, `『${題}』`, W - 80), 40, 66);
+  g.fillStyle = "#59526b";
+  g.font = '400 24px "Zen Old Mincho", serif';
+  g.fillText(`${場所}のベンチで、${分}分読みました`, 40, 110);
+  g.textAlign = "right";
+  g.fillStyle = "#6b4bc4";
+  g.font = '600 18px "Hiragino Sans","Yu Gothic UI","Yu Gothic",sans-serif';
+  g.fillText("GEMuの静かな読書会", W - 40, 110);
+
+  return new Promise((ok, ng)=>c.toBlob(b=>b ? ok(b) : ng(new Error("書き出せませんでした")), "image/jpeg", .9));
+}
 
 document.addEventListener("click", e=>{
   const el = e.target.closest("[data-する]");

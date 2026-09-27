@@ -13,6 +13,7 @@ rules_version = '2';
         rooms/{room}/seats/{席番号}  { uid, title, since, seen }
         logs/{id}            { uid, room, title, from, to }
         meta/usage           { day, count }   ← functions だけが書く（アバターを作った回数・全員ぶん）
+        shares/{id}          { uid, title, minutes, place, image, created }  ← 読み終えて X に投稿したときの記録。だれでも読める
 
    ⚠️ avatar は**裏の処理（functions）だけが書く。**画面からは name と flip（向きを反対にする）しか変えられない。
    ⚠️ 表示名を席や記録に焼き付けない。uid だけ持ち、画面で users から引く。
@@ -74,6 +75,22 @@ service cloud.firestore {
       allow update: if signedIn() && resource.data.uid == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['to'])
         && request.resource.data.to == request.time;
+    }
+
+    /* X に投稿した読書の記録。記録ページ（functions の sharePage）が読む。
+       ⚠️ だれでも読める（X がリンクを開くため）。名前は入れない。書名・分・場所・絵だけ */
+    match /shares/{id} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['uid', 'title', 'minutes', 'place', 'image', 'created'])
+        && request.resource.data.uid == request.auth.uid
+        && validTitle(request.resource.data.title)
+        && request.resource.data.minutes is int
+        && request.resource.data.minutes >= 0 && request.resource.data.minutes < 1440
+        && request.resource.data.place is string && request.resource.data.place.size() <= 40
+        && request.resource.data.image is string
+        && request.resource.data.image.matches('https://firebasestorage[.]googleapis[.]com/.*')
+        && request.resource.data.created == request.time;
     }
 
     match /{rest=**} { allow read, write: if false; }

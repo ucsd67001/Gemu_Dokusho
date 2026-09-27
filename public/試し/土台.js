@@ -89,6 +89,13 @@ export async function 名を決める(名){
 }
 
 export async function 向きを確かめる(){}
+// 試しの絵はもともと data URL なので、そのまま返す。記録ページは作らず、試しの入口を返す
+export async function 絵を借りる(道ら){
+  const 返す = {};
+  for(const 道 of 道ら.filter(Boolean)) 返す[道] = await 絵のURL(道);
+  return 返す;
+}
+export async function 共有を作る(){ return location.origin + "/demo"; }
 export async function 背中を足す(){}
 export async function 向きを反対にする(反転){
   const s = 読む();
