@@ -76,6 +76,12 @@ img{max-width:100%;display:block}
 .帯 nav button:hover{color:var(--字)}
 .帯 nav button.いま{color:var(--字);border-bottom-color:var(--字)}
 .帯の右{display:flex;align-items:center;gap:14px}
+/* 自分（顔と名前）。Hongaeshi の .わたし と同じ。枠は指を乗せたときだけ */
+.わたし{display:flex;align-items:center;gap:8px;padding:5px 9px 5px 5px;border-radius:2px;
+  box-shadow:inset 0 0 0 1px transparent;transition:.14s;max-width:210px}
+.わたし:hover{box-shadow:inset 0 0 0 1px var(--罫の濃い)}
+.わたし .名{font-family:var(--ゴシック);font-size:12px;color:var(--字の薄い);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* 顔。ブロックの顔なので丸く切らない */
 .顔{width:28px;height:28px;border-radius:2px;background:var(--灯の淡い);flex:none;
@@ -206,6 +212,10 @@ h2.節見出し{font-size:17px;font-weight:600;letter-spacing:.09em;margin:0}
 .名の札 span{display:block;font-family:var(--明朝);font-size:max(10px,1.05cqi);
   color:var(--字の薄い);overflow:hidden;text-overflow:ellipsis}
 .名の札.自分{border-color:var(--灯)}
+/* 指を乗せる（スマホは押す）と、名前と題の全文を出す。いちばん上に重ねる（2026-09-27 配信者） */
+.名の札{cursor:default;outline:none}
+.名の札:hover,.名の札:focus{max-width:none;z-index:20}
+.名の札:hover b,.名の札:hover span,.名の札:focus b,.名の札:focus span{overflow:visible;text-overflow:clip}
 /* 二人掛けのベンチに2人いるときは、2人目の名札を1段下げる。
    ⚠️ 左右に振り分けると、ベンチを横一列に並べたとき（2026-09-27）隣のブロックの名札とぶつかった。
    ⚠️ 名札の幅は、ブロックの間（舞台の16%ほど）に収まるように 12cqi まで。長い題は … で切り、全文は title と舞台の下の一覧で */
@@ -290,6 +300,9 @@ h2.節見出し{font-size:17px;font-weight:600;letter-spacing:.09em;margin:0}
   .帯 .中{gap:12px}
   /* 「GEMuの静かな読書会」は長いので、狭い画面では字を詰める（メニューが縦に折れた） */
   .銘{font-size:15px;letter-spacing:.04em}
+  /* 狭い画面では名前を隠して顔だけ（Hongaeshi と同じ。帯が1行に収まらない） */
+  .わたし .名{display:none}
+  .わたし{padding:3px}
   .銘 .粒{margin-right:6px}
   /* 2段目の名札は舞台の下へはみ出す。下の段とぶつからないように余白を取る */
   #舞台{margin-bottom:34px}
