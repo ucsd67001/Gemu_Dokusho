@@ -9,12 +9,12 @@ rules_version = '2';
    ⚠️ 名前は ASCII（Hongaeshi と同じ。ルールの言語が日本語の識別子を受け付けない）。
       翻訳しているのは public/土台.js だけ。
 
-        users/{uid}          { name, created, avatar{ status, step, sit, turn, face, error, at, day, count } }
+        users/{uid}          { name, created, flip, avatar{ status, step, sit, turn, face, facing, error, at, day, count } }
         rooms/{room}/seats/{席番号}  { uid, title, since, seen }
         logs/{id}            { uid, room, title, from, to }
         meta/usage           { day, count }   ← functions だけが書く（アバターを作った回数・全員ぶん）
 
-   ⚠️ avatar は**裏の処理（functions）だけが書く。**画面からは name しか変えられない。
+   ⚠️ avatar は**裏の処理（functions）だけが書く。**画面からは name と flip（向きを反対にする）しか変えられない。
    ⚠️ 表示名を席や記録に焼き付けない。uid だけ持ち、画面で users から引く。
    ============================================================ */
 service cloud.firestore {
@@ -34,8 +34,9 @@ service cloud.firestore {
         && validName(request.resource.data.name)
         && request.resource.data.created == request.time;
       allow update: if signedIn() && isSelf(uid)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
-        && validName(request.resource.data.name);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'flip'])
+        && validName(request.resource.data.name)
+        && (!('flip' in request.resource.data) || request.resource.data.flip is bool);
     }
 
     /* 席。文書の id が席の番号。

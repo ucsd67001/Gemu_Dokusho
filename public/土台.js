@@ -5,7 +5,7 @@
       読み書きの境目にあたる**このファイルだけが両方の名前を知っている。**
       外へ出すものは、必ず日本語のかたちに直してから返す。
 
-        users/{uid}                 → 人   { 名, アバター{ 状態, 段階, 座る, めくる, 顔, 誤り } }
+        users/{uid}                 → 人   { 名, 反転, アバター{ 状態, 段階, 座る, めくる, 顔, 向き, 誤り } }
         rooms/{room}/seats/{番}     → 席   { 番, uid, 題, 入った, 見た }
         logs/{id}                   → 記録 { 部屋, 題, 始め, 終わり }
 
@@ -74,10 +74,12 @@ function 人に(d){
   return {
     uid: d.id,
     名: x.name || "",
+    反転: !!x.flip,          // 本人が「向きを反対にする」を押したか
     アバター: {
       状態: a.status || "none",   // none / making / ready / failed
       段階: a.step || "",
       座る: a.sit || "", めくる: a.turn || "", 顔: a.face || "",
+      向き: a.facing || "",    // 座る姿の向き "left" / "right"。まだ見ていなければ ""
       誤り: a.error || "",
     }
   };
@@ -107,6 +109,14 @@ export async function 名を決める(名){
 export async function アバターを作る(写真){
   const f = httpsCallable(呼ぶ, "makeAvatar", { timeout: 540000 });
   await f({ photo:写真 });
+}
+
+// 向きを記録する前に作ったアバターのため。記録されていなければ、裏の処理が一度だけ見る
+export async function 向きを確かめる(){
+  await httpsCallable(呼ぶ, "detectFacing", { timeout: 60000 })({});
+}
+export async function 向きを反対にする(反転){
+  await updateDoc(doc(db, "users", 私.uid), { flip:反転 });
 }
 
 const URLの控え = new Map();

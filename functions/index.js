@@ -1,7 +1,9 @@
 /* ============================================================
    GEMu 読書会 ― 裏の処理
 
-   いまあるのは1つだけ：
+   いまあるのは2つ：
+     detectFacing  できているアバター（座る姿）が、左右どちらを向いているかを見て記録する
+                   （向きを記録する前に作ったアバターのため。画面が一度だけ呼ぶ）
      makeAvatar  写真から、ブロック風のアバターを3枚作る
                  ① 椅子ごと座って本を読む姿（sit）
                  ② 同じ姿で、ページをめくっているところ（turn）
@@ -13,6 +15,9 @@
    ⚠️ ②と③は、写真からではなく **①から作る。**写真から3回作ると、
       3枚が別人になる（顔も服も毎回変わる）。
    ⚠️ 椅子ごと描かせるのは、背景の椅子に重ねると、向きと高さがずれて浮いて見えるため。
+   ⚠️⚠️ **「右前を向く」と頼んでも、左を向いて描かれることがある**（2026-09-27、配信者の一枚目がそうだった）。
+      → 描いたあとに、左右どちらを向いているかを見る（avatar.facing＝"left"/"right"）。
+        部屋では、席の「テーブルの方向」と違えば左右を反転する。見分けを間違えたら、本人が「自分」で反対にできる（users.flip）。
    ⚠️ 1人1日5回まで、**全員あわせて1日30回まで**（日本の日付で数える）。1回で絵を3枚作るので、料金はその3倍。
       だれでもログインして登録できる形にしたので、全員ぶんの上限が料金の歯止め（meta/usage）。
 
@@ -104,6 +109,7 @@ export const makeAvatar = onCall({
     const ai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
     const 座る = await 描く(ai, 写真, "photo.jpg", "image/jpeg", 座る指示);
     await 進み("ページをめくる姿と、顔を描いています（2/3）");
+    const 向きの約束 = 向きを見る(ai, 座る, "image/png");
     const [めくる, 顔] = await Promise.all([
       描く(ai, 座る, "sit.png", "image/png", めくる指示),
       描く(ai, 座る, "sit.png", "image/png", 顔の指示),
@@ -116,9 +122,10 @@ export const makeAvatar = onCall({
       置く(私.uid, 版, "turn", めくる, 640),
       置く(私.uid, 版, "face", 顔, 256),
     ]);
+    const facing = await 向きの約束;
     await 利用者.set({ avatar: {
-      status: "ready", step: FieldValue.delete(), sit, turn, face, at: FieldValue.serverTimestamp()
-    }}, { merge: true });
+      status: "ready", step: FieldValue.delete(), sit, turn, face, facing, at: FieldValue.serverTimestamp()
+    }, flip: false }, { merge: true });
     await 古い版を消す(私.uid, 版);
     return { ok: true };
   }catch(e){
@@ -128,6 +135,45 @@ export const makeAvatar = onCall({
     throw new HttpsError("internal", 文);
   }
 });
+
+/* ── 向きを確かめる ─────────────────────────── */
+export const detectFacing = onCall({
+  region: "asia-northeast1",
+  secrets: [OPENAI_API_KEY],
+  timeoutSeconds: 60,
+}, async req => {
+  if(!req.auth) throw new HttpsError("unauthenticated", "ログインしてください");
+  const 利用者 = db.doc(`users/${req.auth.uid}`);
+  const a = (await 利用者.get()).data()?.avatar || {};
+  if(!a.sit) throw new HttpsError("failed-precondition", "アバターがまだありません");
+  if(a.facing) return { facing: a.facing };
+  const [絵] = await getStorage().bucket().file(a.sit).download();
+  const facing = await 向きを見る(new OpenAI({ apiKey: OPENAI_API_KEY.value() }), 絵, "image/webp");
+  await 利用者.set({ avatar: { facing } }, { merge: true });
+  return { facing };
+});
+
+/* 座っている姿が、見る人から見て左右どちらを向いているか。
+   ⚠️ 見分けられなかったら "right"（頼んだ向き）にする。間違えていたら本人が「自分」で反対にできる */
+async function 向きを見る(ai, 絵, 型){
+  try{
+    const r = await ai.chat.completions.create({
+      model: "gpt-4.1-mini",
+      max_tokens: 3,
+      messages: [{ role: "user", content: [
+        { type: "text", text:
+          "This image shows a blocky character sitting on a chair. From the viewer's point of view, " +
+          "is the character's face and body turned toward the LEFT side or the RIGHT side of the image? " +
+          "Answer with exactly one word: left or right." },
+        { type: "image_url", image_url: { url: `data:${型};base64,${絵.toString("base64")}`, detail: "low" } },
+      ]}],
+    });
+    return /left/i.test(r.choices?.[0]?.message?.content || "") ? "left" : "right";
+  }catch(e){
+    console.error("向きを見られませんでした", e);
+    return "right";
+  }
+}
 
 /* ── 道具 ─────────────────────────────── */
 function 写真をほどく(dataUrl){

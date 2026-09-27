@@ -68,8 +68,9 @@ export async function 出る(){
 /* ── 人 ─────────────────────────────── */
 function 人に(uid, x){
   const a = x.アバター || {};
-  return { uid, 名:x.名 || "", アバター:{ 状態:a.状態 || "none", 段階:a.段階 || "",
-    座る:a.座る || "", めくる:a.めくる || "", 顔:a.顔 || "", 誤り:a.誤り || "" } };
+  return { uid, 名:x.名 || "", 反転:!!x.反転, アバター:{ 状態:a.状態 || "none", 段階:a.段階 || "",
+    座る:a.座る || "", めくる:a.めくる || "", 顔:a.顔 || "",
+    向き:a.座る ? "right" : "", 誤り:a.誤り || "" } };   // 仮の絵は正面向きなので、右とみなす
 }
 export function 自分を見張る(届いたら){
   return 見張る(()=>{ const x = 読む().人[私?.uid]; 届いたら(x ? 人に(私.uid, x) : null); });
@@ -83,6 +84,13 @@ export function 人々を見張る(届いたら){
 export async function 名を決める(名){
   const s = 読む();
   s.人[私.uid] = { ...(s.人[私.uid] || {}), 名 };
+  書く(s);
+}
+
+export async function 向きを確かめる(){}
+export async function 向きを反対にする(反転){
+  const s = 読む();
+  s.人[私.uid] = { ...(s.人[私.uid] || {}), 反転 };
   書く(s);
 }
 
