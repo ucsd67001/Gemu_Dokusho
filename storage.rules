@@ -5,14 +5,12 @@ rules_version = '2';
 
    ⚠️ 置くのは**出来上がったアバターの絵だけ。**書くのは裏の処理（functions）だけ。
    ⚠️⚠️ **元の写真は置かない。**アバターを作るために OpenAI へ送るだけで、どこにも残さない。
-   ⚠️ 読めるのは招待されたひとだけ（Firestore の allow を見に行く）。
+   ⚠️ 読めるのはログインしたひとだけ。
    ============================================================ */
 service firebase.storage {
   match /b/{bucket}/o {
     match /avatars/{uid}/{rest=**} {
-      allow read: if request.auth != null
-        && request.auth.token.email_verified == true
-        && firestore.exists(/databases/(default)/documents/allow/$(request.auth.token.email));
+      allow read: if request.auth != null;
       allow write: if false;
     }
     match /{rest=**} { allow read, write: if false; }

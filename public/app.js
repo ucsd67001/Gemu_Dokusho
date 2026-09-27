@@ -18,7 +18,7 @@ const 根 = 試しか ? "/demo" : "";
 
 const 画面 = document.getElementById("画面");
 const 状態 = {
-  起きた:false, 私:null, 招待:false,
+  起きた:false, 私:null,
   自分:undefined,          // undefined＝読み込み中／null＝まだ名前が無い
   人々:new Map(),
   席ら:[],                 // いま見ている部屋の席
@@ -97,7 +97,6 @@ function 描く(){
 
   if(!状態.起きた) return 画面.innerHTML = 待ちの画面("ひらいています");
   if(!状態.私) return 入口();
-  if(!状態.招待) return 招待されていない();
   if(状態.自分 === undefined) return 画面.innerHTML = 待ちの画面("読みこんでいます");
 
   const 自分 = 状態.自分, a = 自分?.アバター;
@@ -115,7 +114,7 @@ function 描く(){
 }
 
 function 帯を描く(){
-  const 入った = 状態.私 && 状態.招待 && 状態.自分?.アバター?.座る;
+  const 入った = 状態.私 && 状態.自分?.アバター?.座る;
   document.getElementById("nav").innerHTML = 入った ? [
     ["廊下", "カフェ"], ["記録", "記録"], ["自分", "自分"],
   ].map(([頁, 字])=>`<button class="${状態.頁 === 頁 || (頁 === "廊下" && 状態.頁 === "部屋") ? "いま" : ""}"
@@ -146,17 +145,7 @@ function 入口(){
     </div>
     <p class="注">${試しか
       ? "これは試しです。この端末のブラウザの中だけで動きます。タブを2つ開くと、2人で入れます。"
-      : "招待制です。いまは仲間うちだけで使っています。"}</p>
-  </section>`;
-}
-
-function 招待されていない(){
-  画面.innerHTML = `
-  <section class="幕">
-    <p class="英字の札">Invitation only</p>
-    <h1 class="中見出し">まだ招待されていないアカウントです</h1>
-    <p class="導き">${逃(状態.私.メール)} は、招待の一覧にありません。運営者に、このメールアドレスを伝えてください。</p>
-    <div class="釦たち" style="margin-top:26px"><button class="釦 枠だけ" data-する="出る">別のアカウントで入る</button></div>
+      : "はじめて入るときに、名前と写真を決めます。"}</p>
   </section>`;
 }
 
@@ -562,13 +551,13 @@ document.addEventListener("change", async e=>{
   if(頁) 状態.頁 = 頁;
 }
 描く();
-土台.起動(({ 私, 招待 })=>{
+土台.起動(({ 私 })=>{
   自分の見張り?.(); 人々の見張り?.();
   自分の見張り = 人々の見張り = null;
   状態.起きた = true;
-  状態.私 = 私; 状態.招待 = 招待;
+  状態.私 = 私;
   状態.自分 = undefined; 状態.人々 = new Map();
-  if(私 && 招待){
+  if(私){
     自分の見張り = 土台.自分を見張る(自分=>{
       const 前 = 状態.自分;
       // 中身が同じなら描き直さない（入れかけの名前が消えるため。試しでは、ほかのタブの変化でも届く）

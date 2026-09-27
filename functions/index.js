@@ -13,7 +13,8 @@
    ⚠️ ②と③は、写真からではなく **①から作る。**写真から3回作ると、
       3枚が別人になる（顔も服も毎回変わる）。
    ⚠️ 椅子ごと描かせるのは、背景の椅子に重ねると、向きと高さがずれて浮いて見えるため。
-   ⚠️ 1日5回まで（日本の日付で数える）。1回で絵を3枚作るので、料金はその3倍。
+   ⚠️ 1人1日5回まで、**全員あわせて1日30回まで**（日本の日付で数える）。1回で絵を3枚作るので、料金はその3倍。
+      だれでもログインして登録できる形にしたので、全員ぶんの上限が料金の歯止め（meta/usage）。
 
    鍵：OPENAI_API_KEY は Secret Manager に置く（README「鍵」）。
    ============================================================ */
@@ -32,7 +33,8 @@ const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
 // ⚠️ 画像のモデルは、新しいものが出たら差し替えられるようにしておく（functions/.env に IMAGE_MODEL=…）
 const IMAGE_MODEL = defineString("IMAGE_MODEL", { default: "gpt-image-1" });
 
-const 一日の上限 = 5;
+const 一日の上限 = 5;          // 1人あたり
+const 全員の一日の上限 = 30;   // 全員あわせて
 const 写真の上限 = 6 * 1024 * 1024;   // 画面で 1024px の JPEG に縮めてから送るので、ふつうは 0.3MB ほど
 
 /* ── 絵の指示 ──────────────────────────────
@@ -71,18 +73,15 @@ export const makeAvatar = onCall({
 }, async req => {
   const 私 = req.auth;
   if(!私) throw new HttpsError("unauthenticated", "ログインしてください");
-  const メール = 私.token.email;
-  if(!私.token.email_verified || !メール
-     || !(await db.doc(`allow/${メール}`).get()).exists)
-    throw new HttpsError("permission-denied", "招待されていないアカウントです");
 
   const 写真 = 写真をほどく(req.data?.photo);
   const 利用者 = db.doc(`users/${私.uid}`);
+  const 全員 = db.doc("meta/usage");
 
   // 回数と、作っている最中かを1つのトランザクションで見る（二度押しで2回走らせない）
   const 今日 = 日本の日付();
   await db.runTransaction(async tx => {
-    const s = await tx.get(利用者);
+    const [s, u] = await Promise.all([tx.get(利用者), tx.get(全員)]);
     if(!s.exists) throw new HttpsError("failed-precondition", "先に名前を決めてください");
     const a = s.data().avatar || {};
     const 最中 = a.status === "making" && a.at && Date.now() - a.at.toMillis() < 10 * 60 * 1000;
@@ -90,6 +89,10 @@ export const makeAvatar = onCall({
     const 回 = a.day === 今日 ? (a.count || 0) : 0;
     if(回 >= 一日の上限)
       throw new HttpsError("resource-exhausted", `アバターを作れるのは1日${一日の上限}回までです`);
+    const 全員の回 = u.exists && u.data().day === 今日 ? (u.data().count || 0) : 0;
+    if(全員の回 >= 全員の一日の上限)
+      throw new HttpsError("resource-exhausted", "今日はアバターを作れる回数が終わりました。明日また試してください");
+    tx.set(全員, { day: 今日, count: 全員の回 + 1 });
     tx.set(利用者, { avatar: {
       ...a, status: "making", step: "座っている姿を描いています（1/3）",
       error: FieldValue.delete(), at: FieldValue.serverTimestamp(), day: 今日, count: 回 + 1

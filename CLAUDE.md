@@ -22,8 +22,9 @@
 ## 絶対のルール
 
 - **配信者への返答・報告は日本語で書く。**
-- **鍵を読まない・表示しない・上げない。**OpenAI の鍵は Secret Manager（functions）と `~/.gemu-dokusho/openai.txt`（道具）。
-  ⚠️ **GEMu_AITuber の `.env` の鍵を、このアプリに使わない**（2026-09-27、こちらから使おうとして止められた。筋として正しい）。
+- **鍵を読まない・表示しない・上げない。**OpenAI の鍵は Secret Manager の `OPENAI_API_KEY`（**Hongaeshi と同じ鍵**。配信者の指示）。
+  道具も同じところから firebase コマンドで読む。ファイルに書き出さない。
+  ⚠️ **GEMu_AITuber の `.env` の鍵は使わない**（2026-09-27、こちらから使おうとして止められた）。
 - **利用者の名前・写真・メールアドレスを、リポジトリに入れない。**試しの人の名前は架空にする（いまは「しおり」）。
 - **デプロイは `--project gemu-dokusho` を必ず付ける。**Functions と hosting を一緒に出さない。
 
@@ -39,8 +40,7 @@
 
 | | |
 |---|---|
-| ⚠️ Firebase の準備（配信者） | **Blaze にする／Authentication で Google をオン／Firestore を東京（asia-northeast1）で作る／Storage を作る。**ウェブアプリの登録はこちらで済ませた（App ID `1:520299227021:web:43574043c8a2a09be07fc4`） |
-| ⚠️ OpenAI の鍵（配信者） | このアプリ用の鍵を作り、`firebase functions:secrets:set OPENAI_API_KEY --project gemu-dokusho`。部屋の絵の道具用に `~/.gemu-dokusho/openai.txt` にも |
-| 招待 | `allow/{メール}` に配信者と仲間の2人を足す |
+| ✅ Firebase と鍵 | 済み（2026-09-27）。ルール・functions（`makeAvatar`）・画面を上げた。**https://gemu-dokusho.web.app** |
+| 登録 | 招待制はやめた。**Google で入った人は、その場で名前と写真を決めて登録**（Hongaeshi と同じ）。料金の歯止めは 1人1日5回・全員1日30回 |
 | 部屋の絵 | いまは線で描いた仮の部屋（`部屋.js` の `仮のカフェ`）。**本物を作ったら、席の座標を測り直す** |
 | 本番で未検証 | アバターの3枚（とくに②③が①と同じ人に見えるか）／写真の顔がブロックに残るか／1〜2分で終わるか |

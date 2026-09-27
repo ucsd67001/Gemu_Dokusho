@@ -3,9 +3,8 @@ rules_version = '2';
 /* ============================================================
    GEMu 読書会 ― Firestore のきまり
 
-   ⚠️⚠️ **招待制。**allow/{メールアドレス} に文書があるひとだけが使える。
-      アバターを作るたびに OpenAI の料金がかかるので、知らない人に入られないように。
-      招待するときは、Firebase コンソールで allow に文書を1つ足す（中身は空でよい）。
+   ⚠️ **Google でログインした人は、だれでもその場で登録できる**（Hongaeshi と同じ。2026-09-27 配信者の決定）。
+      初めは招待制にしていたが、やめた。料金の歯止めは functions の回数の上限（1人1日・全員1日）で持つ。
 
    ⚠️ 名前は ASCII（Hongaeshi と同じ。ルールの言語が日本語の識別子を受け付けない）。
       翻訳しているのは public/土台.js だけ。
@@ -13,6 +12,7 @@ rules_version = '2';
         users/{uid}          { name, created, avatar{ status, step, sit, turn, face, error, at, day, count } }
         rooms/{room}/seats/{席番号}  { uid, title, since, seen }
         logs/{id}            { uid, room, title, from, to }
+        meta/usage           { day, count }   ← functions だけが書く（アバターを作った回数・全員ぶん）
 
    ⚠️ avatar は**裏の処理（functions）だけが書く。**画面からは name しか変えられない。
    ⚠️ 表示名を席や記録に焼き付けない。uid だけ持ち、画面で users から引く。
@@ -20,27 +20,20 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function invited() {
-      return request.auth != null
-        && request.auth.token.email_verified == true
-        && exists(/databases/$(database)/documents/allow/$(request.auth.token.email));
+    function signedIn() {
+      return request.auth != null;
     }
     function isSelf(uid) { return request.auth.uid == uid; }
     function validName(n) { return n is string && n.size() >= 1 && n.size() <= 20; }
     function validTitle(t) { return t is string && t.size() >= 1 && t.size() <= 120; }
 
-    // 自分が招待されているかだけは、入る前に確かめられる
-    match /allow/{email} {
-      allow get: if request.auth != null && request.auth.token.email == email;
-    }
-
     match /users/{uid} {
-      allow read: if invited();
-      allow create: if invited() && isSelf(uid)
+      allow read: if signedIn();
+      allow create: if signedIn() && isSelf(uid)
         && request.resource.data.keys().hasOnly(['name', 'created'])
         && validName(request.resource.data.name)
         && request.resource.data.created == request.time;
-      allow update: if invited() && isSelf(uid)
+      allow update: if signedIn() && isSelf(uid)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
         && validName(request.resource.data.name);
     }
@@ -58,24 +51,24 @@ service cloud.firestore {
           && request.resource.data.since is timestamp
           && request.resource.data.since <= request.time;
       }
-      allow read: if invited();
-      allow create: if invited() && room == 'cafe' && seat in ['0', '1', '2', '3'] && shape();
-      allow update: if invited() && shape() && (resource.data.uid == request.auth.uid || stale());
-      allow delete: if invited() && (resource.data.uid == request.auth.uid || stale());
+      allow read: if signedIn();
+      allow create: if signedIn() && room == 'cafe' && seat in ['0', '1', '2', '3'] && shape();
+      allow update: if signedIn() && shape() && (resource.data.uid == request.auth.uid || stale());
+      allow delete: if signedIn() && (resource.data.uid == request.auth.uid || stale());
     }
 
     /* 読んだ時間の記録。入室で作り、1分ごとに to を延ばす。
        ⚠️ 立つときに書くだけだと、タブを閉じた回が記録に残らない。 */
     match /logs/{id} {
-      allow read: if invited();
-      allow create: if invited()
+      allow read: if signedIn();
+      allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['uid', 'room', 'title', 'from', 'to'])
         && request.resource.data.uid == request.auth.uid
         && validTitle(request.resource.data.title)
         && request.resource.data.room is string
         && request.resource.data.from == request.time
         && request.resource.data.to == request.time;
-      allow update: if invited() && resource.data.uid == request.auth.uid
+      allow update: if signedIn() && resource.data.uid == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['to'])
         && request.resource.data.to == request.time;
     }

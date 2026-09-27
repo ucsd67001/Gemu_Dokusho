@@ -37,7 +37,8 @@ export let 私 = null;        // { uid, 名, メール }
 const 古いとみなす = 3 * 60 * 1000;   // firestore.rules の stale() と同じ3分
 
 /* ── 立ち上げ ───────────────────────────────
-   変わったら({ 私, 招待 }) を、ログインの状態が変わるたびに呼ぶ */
+   変わったら({ 私 }) を、ログインの状態が変わるたびに呼ぶ。
+   ⚠️ 招待の一覧は無い。Google で入った人は、名前と写真を決めればそのまま登録になる */
 export async function 起動(変わったら){
   const 設定 = await fetch("/__/firebase/init.json").then(r=>{
     if(!r.ok) throw new Error("init.json が読めません（firebase serve か Hosting で開いてください）");
@@ -49,14 +50,9 @@ export async function 起動(変わったら){
   倉   = getStorage(app);
   呼ぶ = getFunctions(app, "asia-northeast1");
 
-  onAuthStateChanged(auth, async u=>{
+  onAuthStateChanged(auth, u=>{
     私 = u ? { uid:u.uid, 名:u.displayName || "", メール:u.email } : null;
-    let 招待 = false;
-    if(u){
-      try{ 招待 = (await getDoc(doc(db, "allow", u.email))).exists(); }
-      catch(e){ 招待 = false; }
-    }
-    変わったら({ 私, 招待 });
+    変わったら({ 私 });
   });
 }
 
@@ -93,7 +89,7 @@ export function 自分を見張る(届いたら){
     e=>{ console.error(e); 届いたら(null); });
 }
 
-// 部屋にいる人の名前と絵を引くため。招待制で人数が少ないので、全員ぶんを見張る
+// 部屋にいる人の名前と絵を引くため。人数が少ないうちは全員ぶんを見張る（増えたら、席にいる人だけに絞る）
 export function 人々を見張る(届いたら){
   return onSnapshot(collection(db, "users"),
     s=>届いたら(new Map(s.docs.map(d=>[d.id, 人に(d)]))),

@@ -5,8 +5,9 @@
      node 04_tools/部屋を作る.mjs          … 2枚作る
      node 04_tools/部屋を作る.mjs 4        … 4枚作る
 
-   ・鍵は ~/.gemu-dokusho/openai.txt から読む（リポジトリの外。1行に鍵だけ）
-     ⚠️ GEMu_AITuber の .env の鍵は使わない。このアプリ用に別の鍵を作る
+   ・鍵は Secret Manager（functions と同じ OPENAI_API_KEY）から、firebase コマンドで読む。
+     **ファイルに書き出さない。**画面にも出さない（読んだものをそのまま API へ渡すだけ）
+     ⚠️ 鍵は Hongaeshi と同じもの（2026-09-27 配信者の指示）。GEMu_AITuber の .env の鍵は使わない
    ・できた絵は 04_tools/下書き/ に PNG と WebP で置く（.gitignore 済み）
    ・気に入った1枚の WebP を public/部屋/cafe.webp にして、
      public/部屋.js の 絵: と 比: と 席 を直す（README「部屋の絵を差し替える」）
@@ -15,8 +16,8 @@
    ⚠️ 椅子も描かせない。アバターは椅子ごと描いてある（functions/index.js）。
       代わりに、テーブルのまわりに**何も置いていない床**を4か所あけさせる。
    ============================================================ */
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
+import { writeFileSync, mkdirSync } from "node:fs";
+import { execSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
@@ -25,7 +26,8 @@ const ここ = dirname(fileURLToPath(import.meta.url));
 // sharp は functions に入っているものを借りる
 const sharp = createRequire(join(ここ, "../functions/package.json"))("sharp");
 
-const 鍵 = readFileSync(join(homedir(), ".gemu-dokusho", "openai.txt"), "utf8").trim();
+const 鍵 = execSync("firebase functions:secrets:access OPENAI_API_KEY --project gemu-dokusho",
+  { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
 const 枚数 = Math.min(4, Math.max(1, Number(process.argv[2]) || 2));
 const モデル = process.env.IMAGE_MODEL || "gpt-image-1";
 

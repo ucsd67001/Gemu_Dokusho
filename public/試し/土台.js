@@ -50,19 +50,19 @@ export async function 起動(変わったら){
   let uid = null;
   try{ uid = sessionStorage.getItem("gemu試しの私"); }catch{}
   私 = uid ? { uid, 名:"試しの読者", メール:"demo@example.com" } : null;
-  変わったら({ 私, 招待:true });
+  変わったら({ 私 });
 }
 export async function 入る(){
   const uid = "試し-" + Math.random().toString(36).slice(2, 8);
   try{ sessionStorage.setItem("gemu試しの私", uid); }catch{}
   私 = { uid, 名:"試しの読者", メール:"demo@example.com" };
-  変わったらを({ 私, 招待:true });
+  変わったらを({ 私 });
 }
 export async function 出る(){
   await 立つ();
   try{ sessionStorage.removeItem("gemu試しの私"); }catch{}
   私 = null;
-  変わったらを({ 私, 招待:false });
+  変わったらを({ 私 });
 }
 
 /* ── 人 ─────────────────────────────── */

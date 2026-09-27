@@ -23,7 +23,7 @@ mekuru（https://www.mekuru.app/ja）に近いが、**当面は配信者と仲�
 
 ## いまできること（2026-09-27 に作った最初の形）
 
-1. **Google で入る。**招待制（`allow/{メールアドレス}` にある人だけ）
+1. **Google で入る。**はじめて入った人は、その場で名前と写真を決めて登録する（Hongaeshi と同じ。招待制はやめた）
 2. **初回：名前と写真を決める → アバターを3枚作る**
    ①椅子ごと座って本を読む姿 ②ページをめくる姿 ③顔のアイコン（どれも背景は透明）
 3. **廊下**：部屋の一覧（いまは「カフェ」だけ）。誰が中にいるか顔で見える
@@ -31,7 +31,7 @@ mekuru（https://www.mekuru.app/ja）に近いが、**当面は配信者と仲�
    ときどきページをめくる（①と②が入れかわる）
 5. **X に投稿**：「いま『〈書名〉』を読んでいます」の入った X の投稿画面を開く（押すのは本人）
 6. **記録**：席に着いていた時間（今日・7日・これまで、1回ごと）
-7. **自分**：名前を直す・アバターを作り直す（1日5回まで）・ログアウト
+7. **自分**：名前を直す・アバターを作り直す（1人1日5回まで）・ログアウト
 8. **試し（/demo）**：Firebase を使わずに、ブラウザの中だけで全部動く。タブを2つ開くと2人になる
 
 ## 作りの要点（ここだけは先に読んでほしい）
@@ -42,7 +42,7 @@ mekuru（https://www.mekuru.app/ja）に近いが、**当面は配信者と仲�
 
 | コレクション | 中身 | 書くのは |
 |---|---|---|
-| `allow/{メール}` | 招待の一覧（中身は空でよい） | 運営者がコンソールで |
+| `meta/usage` | アバターを作った回数（全員ぶん・今日） | **functions だけ** |
 | `users/{uid}` | `name`, `created`, `avatar{status, step, sit, turn, face, error, at, day, count}` | `name` は本人、`avatar` は **functions だけ** |
 | `rooms/{room}/seats/{番}` | `uid`, `title`, `since`, `seen` | 本人 |
 | `logs/{id}` | `uid`, `room`, `title`, `from`, `to` | 本人 |
@@ -59,7 +59,8 @@ mekuru（https://www.mekuru.app/ja）に近いが、**当面は配信者と仲�
 - ①は**写真から**、②と③は**①から**作る。写真から3回作ると3枚が別人になる
 - **椅子ごと描かせる。**背景の椅子に重ねると、向きと高さが合わずに浮く
 - 人は「右前を向く」で作る。左向きの席は画面で左右反転（`部屋.js` の `向き`）
-- 1日5回まで（日本の日付）。1回で3枚描くので、料金はその3倍
+- **1人1日5回、全員あわせて1日30回まで**（日本の日付。`functions/index.js` の `一日の上限` と `全員の一日の上限`）。
+  だれでも登録できるので、全員ぶんの上限が料金の歯止め。1回で3枚描くので、料金はその3倍
 
 ### 席は「生きている」を1分ごとに送る
 タブを閉じると「立つ」が届かないことがある。**`seen` が3分延びていない席は空き**とみなす
@@ -104,16 +105,15 @@ firebase deploy --project gemu-dokusho --only firestore:rules,firestore:indexes,
 FUNCTIONS_DISCOVERY_TIMEOUT=60000 firebase deploy --project gemu-dokusho --only functions
 ```
 ⚠️ **Functions と hosting を一緒に出さない**（Hongaeshi で、Functions の後片づけのエラーで hosting が公開されないまま終わった）。
+古いイメージを1日で消す設定は 2026-09-27 に入れた（`firebase functions:artifacts:setpolicy`）。
 
 ## 鍵
 
-- **OpenAI の鍵は Secret Manager に置く**：`firebase functions:secrets:set OPENAI_API_KEY --project gemu-dokusho`（配信者が自分で打つ）
-- ⚠️ **GEMu_AITuber の `.env` の鍵を使い回さない。**このアプリ用に、OpenAI で別の鍵を作る（使った額を分けて見られる）
-- 部屋の絵を作る道具は、`~/.gemu-dokusho/openai.txt` から鍵を読む（リポジトリの外）
-
-## 招待する
-
-Firebase コンソール → Firestore → `allow` コレクションに、**文書 ID ＝ Google のメールアドレス**の文書を1つ足す（フィールドは何も要らない）。
+- **OpenAI の鍵は Secret Manager の `OPENAI_API_KEY`。****Hongaeshi と同じ鍵**（2026-09-27 配信者の指示。hongaeshi の Secret Manager から、画面に出さずに写した）
+  - 鍵を替えるとき：`firebase functions:secrets:set OPENAI_API_KEY --project gemu-dokusho`（配信者が打つ）→ functions を上げ直す
+  - ⚠️ **GEMu_AITuber の `.env` の鍵は使わない**
+- 部屋の絵を作る道具も、同じ Secret Manager から firebase コマンドで読む。**鍵をファイルに書き出さない**
+- `functions/.env` には `IMAGE_MODEL=gpt-image-1` だけを置く（鍵ではない。**これが無いと、非対話のデプロイが止まる**）
 
 ## 部屋の絵を差し替える
 
@@ -124,7 +124,7 @@ Firebase コンソール → Firestore → `allow` コレクションに、**文
 ## 決めたこと・保留していること
 
 - **X は投稿画面を開くだけ**（2026-09-27 決定）。X の API は有料で開発者登録が要る。投稿画面には画像を付けられない
-- **招待制**（2026-09-27）。アバターを作るたびに料金がかかるため
+- **招待制はやめ、ログインしたらその場で登録**（2026-09-27 配信者の決定。Hongaeshi と同じ）。料金の歯止めは回数の上限
 - **部屋の絵は「添付の部屋のような、やわらかい立体の絵」、人はブロック風**（2026-09-27 配信者の選択）。
   カフェは**中世ヨーロッパで、明るい雰囲気**
 - 環境音・読書仲間・部屋を増やす・独自ドメインは、使いながら決める
