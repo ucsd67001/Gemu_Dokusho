@@ -254,7 +254,7 @@ function 廊下(){
           <div class="部屋の素性" id="居る数-${id}">${逃(部屋.添え)}</div>
           <div class="顔の列" id="顔の列-${id}"></div>
         </div>
-        <span class="札 藤">入る</span>
+        <span class="札 藤" id="札-${id}">入る</span>
       </button>`).join("")}
     </div>
   </section>`;
@@ -263,7 +263,11 @@ function 廊下(){
     片づけ.push(土台.席を見張る(id, 席ら=>{
       const 数 = document.getElementById(`居る数-${id}`), 列 = document.getElementById(`顔の列-${id}`);
       if(!数) return;
-      数.textContent = 席ら.length ? `いま${席ら.length}人が読んでいます（${部屋.席.length}席）` : `いまは誰もいません（${部屋.席.length}席）`;
+      const 満席 = 席ら.length >= 部屋.席.length;
+      数.textContent = 満席 ? `いまは満席です（${部屋.席.length}人）。のぞいて、ベンチが空くのを待つことはできます`
+        : 席ら.length ? `いま${席ら.length}人が読んでいます（${部屋.席.length}席）` : `いまは誰もいません（${部屋.席.length}席）`;
+      const 札 = document.getElementById(`札-${id}`);
+      if(札){ 札.textContent = 満席 ? "満席" : "入る"; 札.className = 満席 ? "札" : "札 藤"; }
       列.innerHTML = 席ら.map(s=>顔の絵(状態.人々.get(s.uid), "中")).join("");
       絵を入れる(列);
     }));
@@ -290,7 +294,27 @@ function 部屋の頁(){
     <div class="居る列" id="居る列"></div>
   </section>`;
 
-  片づけ.push(土台.席を見張る(状態.部屋, 席ら=>{ 状態.席ら = 席ら; 部屋を描き直す(); }));
+  /* ⚠️ 本の題を聞く窓は、席の様子が届いてから出す（満席なら出さない）。
+        前は開いた瞬間に出していて、9人目にも題を聞き、座ろうとしたところで「満席です」と断っていた */
+  状態.席ら = [];
+  let 初めて = true;
+  片づけ.push(土台.席を見張る(状態.部屋, 席ら=>{
+    const 前は満席 = 満席か();
+    状態.席ら = 席ら;
+    部屋を描き直す();
+    if(土台.座っている()) return;
+    if(初めて){
+      初めて = false;
+      if(!満席か()) 題の窓("席に着く");
+    }else if(前は満席 && !満席か()){
+      知らせる("ベンチがひとつ空きました");
+      if(document.hidden) document.title = "ベンチが空きました ― " + 元の題名;
+    }else if(!前は満席 && 満席か() && document.getElementById("題の欄")){
+      // 題を入れているあいだに、最後のベンチが埋まった
+      窓を閉じる();
+      知らせる("ちょうど今、最後のベンチが埋まりました", true);
+    }
+  }));
 
   // ときどきページをめくる
   const めくり = setInterval(()=>{
@@ -306,8 +330,11 @@ function 部屋の頁(){
   const 時計 = setInterval(手もとを描く, 30000);
   片づけ.push(()=>{ clearInterval(めくり); clearInterval(生きる); clearInterval(時計); });
 
-  if(!土台.座っている()) 題の窓("席に着く");
 }
+
+const 満席か = () => 状態.席ら.length >= (部屋ら[状態.部屋]?.席.length || 0);
+const 元の題名 = document.title;
+addEventListener("visibilitychange", ()=>{ if(!document.hidden) document.title = 元の題名; });
 
 function 部屋を描き直す(){
   const 舞台 = document.getElementById("舞台");
@@ -390,9 +417,14 @@ function 手もとを描く(){
   if(!el) return;
   const 席 = 土台.座っている();
   if(!席){
-    el.innerHTML = `<div class="手もと">
-      <div class="何を"><div class="時">いまは部屋をのぞいているだけです</div></div>
-      <button class="釦" data-する="席に着く">席に着く</button></div>`;
+    const 部屋 = 部屋ら[状態.部屋];
+    el.innerHTML = 満席か() ? `<div class="手もと">
+      <div class="何を"><div class="書名">ベンチが空くのを待っています</div>
+        <div class="時">いまは${部屋.席.length}人ぶんのベンチが、すべて埋まっています。空いたら、ここでお知らせします。<br>それまでは、のぞいて待つことができます。</div></div>
+      <button class="釦" disabled>満席です</button></div>`
+    : `<div class="手もと">
+      <div class="何を"><div class="時">いまはのぞいているだけです</div></div>
+      <button class="釦" data-する="席に着く">ベンチに座る</button></div>`;
     return;
   }
   const 題 = 状態.席ら.find(s=>s.uid === 状態.私.uid)?.題 || 前の題();
@@ -573,7 +605,7 @@ const 動き = {
     try{ await 土台.背中を足す(); 知らせる("背中の姿を足しました"); }
     catch(e){ console.error(e); el.disabled = false; el.textContent = "背中の姿を足す"; 知らせる(e.message || "描けませんでした", true); }
   },
-  席に着く: ()=>題の窓("席に着く"),
+  席に着く: ()=>満席か() ? 知らせる("いまは満席です。空いたら、お知らせします", true) : 題の窓("席に着く"),
   本を替える: ()=>題の窓("本を替える"),
   題を決める: async el=>{
     const 題 = document.getElementById("題の欄").value.trim();
@@ -588,10 +620,33 @@ const 動き = {
     }catch(e){
       console.error(e);
       el.disabled = false;
-      知らせる(e.message === "満席です" ? "満席です。少し待ってから入ってください" : "席に着けませんでした", true);
+      if(e.message === "満席です"){
+        窓を閉じる();
+        手もとを描く();
+        知らせる("ちょうど今、最後のベンチが埋まりました。空いたら、お知らせします", true);
+      }else 知らせる("席に着けませんでした", true);
     }
   },
   読み終える: ()=>読み終える窓(),
+  画像を保存: async ()=>{
+    const { 絵 } = スマホの投稿 || {};
+    if(!絵) return;
+    const ファイル = new File([絵.png], "gemu-dokusho.png", { type:"image/png" });
+    if(navigator.canShare?.({ files:[ファイル] })){
+      try{ await navigator.share({ files:[ファイル] }); }catch(e){ if(e.name !== "AbortError") console.error(e); }
+      return;
+    }
+    // 共有の画面が無い端末では、ファイルとして書き出す
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(絵.png);
+    a.download = "gemu-dokusho.png";
+    a.click();
+  },
+  Xを開いて終える: ()=>{
+    const { 文, 入口 } = スマホの投稿 || {};
+    open("https://x.com/intent/post?text=" + encodeURIComponent(文) + "&url=" + encodeURIComponent(入口), "_blank", "noopener");
+    終える();
+  },
   そのまま終える: ()=>終える(),
   投稿して終える: async el=>{
     el.disabled = true;
@@ -601,18 +656,18 @@ const 動き = {
     const 入口 = location.origin + 根;
     const 絵 = 読み終えの絵;
 
-    // スマホ：共有の画面から X を選ぶと、画像が添付された投稿画面になる
-    if(絵 && matchMedia("(pointer: coarse)").matches && navigator.canShare){
-      const ファイル = new File([絵.png], "gemu-dokusho.png", { type:"image/png" });
-      if(navigator.canShare({ files:[ファイル] })){
-        try{
-          await navigator.share({ files:[ファイル], text:`${文}\n${入口}` });
-          return 終える();
-        }catch(e){
-          if(e.name === "AbortError"){ el.disabled = false; el.textContent = "X に投稿して終える"; return; }
-          console.error(e);   // ほかの失敗は、パソコンと同じやり方へ
-        }
-      }
+    /* スマホ：2つの手順に分ける（1. 画像を保存 2. X の投稿画面を開いて、保存した画像を選ぶ）。
+       ⚠️ 共有の画面で画像と文を一度に X へ渡す形は、iPhone で X が並ばず、うまく投稿できなかった（2026-09-27 配信者） */
+    if(絵 && matchMedia("(pointer: coarse)").matches){
+      スマホの投稿 = { 文, 入口, 絵 };
+      窓を出す("X に投稿する", `
+        <p class="窓の文"><b>1.</b> 画像を保存します。共有の画面が開いたら「画像を保存」を選んでください。</p>
+        <div class="共有の見本"><img src="${URL.createObjectURL(絵.png)}" alt="投稿する絵"></div>
+        <div class="釦たち"><button class="釦 枠だけ" data-する="画像を保存">画像を保存する</button></div>
+        <p class="注">共有の画面に X が並んでいれば、そこで X を選んでもかまいません。画像は長押しでも保存できます。</p>
+        <p class="窓の文" style="margin-top:22px"><b>2.</b> X の投稿画面を開きます。写真のボタンから、保存した画像を選んでください。</p>
+        <div class="釦たち"><button class="釦 藤" data-する="Xを開いて終える">X の投稿画面を開く</button></div>`);
+      return;
     }
 
     // パソコン：画像をコピーしてから投稿画面を開く。投稿画面で貼り付けると、画像が添付される
@@ -646,10 +701,11 @@ const 動き = {
    はいなら、絵・書名・読んだ時間と一緒に投稿する。
    ⚠️ X の投稿画面を開く形（intent）では、画像を添付できない。配信者は**画像を添付した形**を望んだ（2026-09-27）。
       → スマホ：共有の画面（navigator.share）で画像ごと X に渡す
+        （⚠️ iPhone では共有の画面に X が並ばなかった → スマホは「1. 画像を保存 2. 投稿画面を開いて選ぶ」の2手順に）
         パソコン：画像をクリップボードにコピーしてから投稿画面を開き、Ctrl+V で貼ってもらう
         どちらもできなければ：絵を置いた「読書の記録ページ」（/s/{id}）のリンクを付ける（X がリンクから絵を出す）
    ⚠️ 絵に名前は入れない（ほかの人も写るため）。書名と時間と場所だけ */
-let 読み終えの絵 = null, 読み終えの中身 = null;
+let 読み終えの絵 = null, 読み終えの中身 = null, スマホの投稿 = null;
 
 function 読み終える窓(){
   const 席 = 土台.座っている();
