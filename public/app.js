@@ -155,12 +155,12 @@ let 選んだ写真 = null;   // 縮めた data URL
 
 function 写真の欄(){
   return `
-    <label class="名札">自分の写真</label>
+    <label class="名札">自分の写真か、絵</label>
     <div class="写真の枠">
       ${選んだ写真 ? `<img class="写真の見本" src="${選んだ写真}" alt="">` : `<div class="写真の見本">まだです</div>`}
       <div>
         <label class="釦 枠だけ 小">写真を選ぶ<input type="file" accept="image/*" data-する="写真"></label>
-        <p class="注" style="margin-top:8px">顔と服が分かる写真がおすすめです。</p>
+        <p class="注" style="margin-top:8px">自分の写真でも、好きなキャラクターの絵でも。写っているものを、そのままブロックの姿にします。</p>
       </div>
     </div>
     <p class="注">写真は、アバターを作るために OpenAI へ送るだけで、保存しません。残るのは、できあがったブロックの絵だけです。</p>`;
@@ -200,7 +200,7 @@ function できあがり(){
   <section class="幕">
     <p class="英字の札">Your avatar</p>
     <h1 class="中見出し">できました</h1>
-    <p class="導き">カフェでは、座って読む姿と、ページをめくる姿が、ときどき入れかわります。</p>
+    <p class="導き">奥の席では顔が、手前の席では背中が見えます。ときどき、ページをめくります。</p>
     ${三枚(a)}
     <div class="釦たち" style="margin-top:30px">
       <button class="釦" data-する="カフェへ">カフェへ</button>
@@ -212,8 +212,10 @@ function できあがり(){
 }
 
 const 三枚 = a => `<div class="三枚">
-  <figure><img data-道="${逃(a.座る)}" alt="座って読む姿"><figcaption>座って読む</figcaption></figure>
+  <figure><img data-道="${逃(a.座る)}" alt="座って読む姿"><figcaption>座って読む（奥の席）</figcaption></figure>
   <figure><img data-道="${逃(a.めくる)}" alt="ページをめくる姿"><figcaption>ページをめくる</figcaption></figure>
+  <figure>${a.背中 ? `<img data-道="${逃(a.背中)}" alt="後ろから見た姿">` : `<div class="まだ">まだありません</div>`}
+    <figcaption>背中（手前の席）</figcaption></figure>
   <figure><img data-道="${逃(a.顔)}" alt="顔"><figcaption>顔</figcaption></figure>
 </div>`;
 
@@ -300,11 +302,13 @@ function 部屋を描き直す(){
     const 席 = 部屋.席[s.番];
     if(!席) return "";
     const 人 = 状態.人々.get(s.uid), a = 人?.アバター || {};
+    // 手前の席は背中を見せる。背中の絵がまだ無い人は、顔の絵のまま座る（めくる動きは背中では見えないので同じ絵）
+    const 背中 = 席.姿 === "背中" && !!a.背中;
     return `
-    <div class="人 ${反転するか(人, 席) ? "左向き" : ""}" style="${置き(席, true)}">
+    <div class="人 ${反転するか(人, 席, 背中) ? "左向き" : ""}" style="${置き(席, true)}">
       <div class="姿">
-        <img class="座る" data-道="${逃(a.座る)}" alt="">
-        <img class="めくる" data-道="${逃(a.めくる)}" alt="">
+        <img class="座る" data-道="${逃(背中 ? a.背中 : a.座る)}" alt="">
+        <img class="めくる" data-道="${逃(背中 ? a.背中 : a.めくる)}" alt="">
       </div>
     </div>`;
   }).join("") + 並び.map(s=>{
@@ -337,8 +341,9 @@ function 部屋を描き直す(){
 /* 席の向き（テーブルの方）と、絵の向きが違えば左右を反転する。
    ⚠️ 絵は「右前を向く」と頼んでも左を向くことがあるので、描いたあとに見た向き（アバター.向き）を使う。
       本人が「向きを反対にする」を押していたら、さらに逆にする */
-function 反転するか(人, 席){
+function 反転するか(人, 席, 背中){
   const a = 人?.アバター || {};
+  if(背中) return (a.背中の向き === "left" ? "左" : "右") !== 席.向き;
   let 絵の向き = a.向き === "left" ? "左" : "右";
   if(人?.反転) 絵の向き = 絵の向き === "左" ? "右" : "左";
   return 絵の向き !== 席.向き;
@@ -452,7 +457,10 @@ function 自分の頁(){
     <div class="釦たち" style="margin-top:16px">
       <button class="釦 枠だけ 小" data-する="向きを反対にする">向きを反対にする</button>
     </div>
-    <p class="注">カフェでは、テーブルの方を向いて座ります。逆を向いていたら押してください。</p>
+    <p class="注">カフェでは、テーブルの方を向いて座ります。奥の席で逆を向いていたら押してください。</p>
+    ${a.背中 ? "" : `<div class="釦たち" style="margin-top:18px">
+      <button class="釦 枠だけ 小" data-する="背中を足す">背中の姿を足す</button></div>
+    <p class="注">手前の席では、テーブルに向かう背中が見えます。いまの姿から背中だけを描きます（1分ほど。1日の回数に1回数えます）。</p>`}
     <div class="帳">
       ${写真の欄()}
       ${a.状態 === "failed" && a.誤り ? `<p class="誤りの字">${逃(a.誤り)}</p>` : ""}
@@ -518,6 +526,12 @@ const 動き = {
   向きを反対にする: async ()=>{
     try{ await 土台.向きを反対にする(!状態.自分.反転); 知らせる("向きを反対にしました"); }
     catch(e){ 知らせる("変えられませんでした", true); }
+  },
+  背中を足す: async el=>{
+    el.disabled = true;
+    el.textContent = "背中を描いています…";
+    try{ await 土台.背中を足す(); 知らせる("背中の姿を足しました"); }
+    catch(e){ console.error(e); el.disabled = false; el.textContent = "背中の姿を足す"; 知らせる(e.message || "描けませんでした", true); }
   },
   席に着く: ()=>題の窓("席に着く"),
   本を替える: ()=>題の窓("本を替える"),

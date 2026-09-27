@@ -5,7 +5,7 @@
       読み書きの境目にあたる**このファイルだけが両方の名前を知っている。**
       外へ出すものは、必ず日本語のかたちに直してから返す。
 
-        users/{uid}                 → 人   { 名, 反転, アバター{ 状態, 段階, 座る, めくる, 顔, 向き, 誤り } }
+        users/{uid}                 → 人   { 名, 反転, アバター{ 状態, 段階, 座る, めくる, 顔, 背中, 向き, 背中の向き, 誤り } }
         rooms/{room}/seats/{番}     → 席   { 番, uid, 題, 入った, 見た }
         logs/{id}                   → 記録 { 部屋, 題, 始め, 終わり }
 
@@ -80,6 +80,8 @@ function 人に(d){
       段階: a.step || "",
       座る: a.sit || "", めくる: a.turn || "", 顔: a.face || "",
       向き: a.facing || "",    // 座る姿の向き "left" / "right"。まだ見ていなければ ""
+      背中: a.back || "",      // 後ろから見た姿（手前の席）。背中を足す前に作ったアバターには無い
+      背中の向き: a.backFacing || "",
       誤り: a.error || "",
     }
   };
@@ -114,6 +116,10 @@ export async function アバターを作る(写真){
 // 向きを記録する前に作ったアバターのため。記録されていなければ、裏の処理が一度だけ見る
 export async function 向きを確かめる(){
   await httpsCallable(呼ぶ, "detectFacing", { timeout: 60000 })({});
+}
+// 背中の姿が無いアバターに、背中だけを足す（1回に数える）
+export async function 背中を足す(){
+  await httpsCallable(呼ぶ, "addBack", { timeout: 300000 })({});
 }
 export async function 向きを反対にする(反転){
   await updateDoc(doc(db, "users", 私.uid), { flip:反転 });

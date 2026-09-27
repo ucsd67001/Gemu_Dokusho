@@ -70,6 +70,7 @@ function 人に(uid, x){
   const a = x.アバター || {};
   return { uid, 名:x.名 || "", 反転:!!x.反転, アバター:{ 状態:a.状態 || "none", 段階:a.段階 || "",
     座る:a.座る || "", めくる:a.めくる || "", 顔:a.顔 || "",
+    背中:a.座る ? `試し:${uid}:背中` : "", 背中の向き:a.座る ? "right" : "",
     向き:a.座る ? "right" : "", 誤り:a.誤り || "" } };   // 仮の絵は正面向きなので、右とみなす
 }
 export function 自分を見張る(届いたら){
@@ -88,6 +89,7 @@ export async function 名を決める(名){
 }
 
 export async function 向きを確かめる(){}
+export async function 背中を足す(){}
 export async function 向きを反対にする(反転){
   const s = 読む();
   s.人[私.uid] = { ...(s.人[私.uid] || {}), 反転 };
@@ -111,7 +113,7 @@ export async function アバターを作る(写真){
 }
 
 export async function 絵のURL(道){
-  const m = String(道 || "").match(/^試し:(.+):(座る|めくる|顔)$/);
+  const m = String(道 || "").match(/^試し:(.+):(座る|めくる|顔|背中)$/);
   return m ? ブロックの絵(m[1], m[2]) : "";
 }
 
@@ -215,6 +217,14 @@ function ブロックの絵(uid, 種){
   const 本 =
     升(9, 17, 14, 5, "#7b2f2f") + 升(10, 17, 5, 4, "#fbf6ea") + 升(17, 17, 5, 4, "#fbf6ea") +
     升(15, 17, 2, 5, "#5d2323") + 升(9, 19, 2, 2, 肌) + 升(21, 19, 2, 2, 肌);
+  if(種 === "背中"){
+    // 後ろから：頭は髪だけ、椅子の背もたれが体の手前にくる
+    return 絵に(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges">
+      ${升(11, 14, 10, 8, 服)}${升(9, 15, 2, 5, 服の影)}${升(21, 15, 2, 5, 服の影)}
+      ${升(11, 3, 10, 10, 髪)}${升(11, 12, 10, 1, 肌)}
+      ${升(8, 15, 16, 10, "#8a5a3b")}${升(9, 16, 14, 8, "#a06c47")}
+      ${升(7, 24, 18, 2, "#7a4e33")}${升(8, 26, 2, 5, "#6e4630")}${升(22, 26, 2, 5, "#6e4630")}</svg>`);
+  }
   const めくり = 種 === "めくる" ? 升(17, 13, 4, 4, "#fffaf0") + 升(20, 15, 2, 2, 肌) : "";
   return 絵に(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges">
     ${椅子}${体}${頭}${本}${めくり}</svg>`);
