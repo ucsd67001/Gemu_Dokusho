@@ -205,6 +205,10 @@ h2.節見出し{font-size:17px;font-weight:600;letter-spacing:.09em;margin:0}
 .名の札 span{display:block;font-family:var(--明朝);font-size:max(10px,1.05cqi);
   color:var(--字の薄い);overflow:hidden;text-overflow:ellipsis}
 .名の札.自分{border-color:var(--灯)}
+/* 二人掛けのベンチに2人いるときは、名札を左右に振り分ける（真ん中のままだと重なる。
+   下にずらすと、手前のベンチで舞台からはみ出した） */
+.名の札.寄せ左{transform:translate(calc(-100% + 6px),4px)}
+.名の札.寄せ右{transform:translate(-6px,4px)}
 /* 舞台が狭い（スマホ）ときは、字を小さくして、長い題は … で切る。
    ⚠️ 前は書名を隠していた（名札が重なるので）。**配信者から「スマホで本の題が出ない」**（2026-09-27）。
       何を読んでいるかが見えることが、この場所の肝なので、隠さない */
