@@ -1,0 +1,19 @@
+# ⚠️ 鍵は絶対に入れない。万一この中に置かれても弾けるように、名前で広く落としておく。
+*service-account*.json
+*serviceaccount*.json
+*-firebase-adminsdk-*.json
+鍵*.json
+.env
+.env.*
+*.secret.local
+.secret.local
+*api*.txt
+openai*.txt
+
+node_modules/
+firebase-debug.log
+*.log
+.firebase/
+
+# 部屋の絵を作るときの下書き（採ったものだけ public/部屋/ に置く）
+04_tools/下書き/
