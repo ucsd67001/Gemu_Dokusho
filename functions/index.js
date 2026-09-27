@@ -114,7 +114,7 @@ export const makeAvatar = onCall({
   try{
     const ai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
     const 座る = await 描く(ai, 写真, "photo.jpg", "image/jpeg", 座る指示);
-    await 進み("ページをめくる姿と、顔を描いています（2/3）");
+    await 進み("ページをめくる姿・背中・顔を描いています（2/3）");
     const 向きの約束 = 向きを見る(ai, 座る, "image/png");
     const [めくる, 顔, 背中] = await Promise.all([
       描く(ai, 座る, "sit.png", "image/png", めくる指示),
