@@ -9,6 +9,8 @@
         rooms/{room}/seats/{番}     → 席   { 番, uid, 題, 入った, 見た }
         logs/{id}                   → 記録 { 部屋, 題, 始め, 終わり }
         finishes/{id}               → 読了 { 題, ページ, いつ }
+        books/{id}                  → 本   { id, 題, 著, 版元, isbn, ひとこと, 状態, 申請者 }  状態＝仮登録／本登録／見送り
+        admins/{uid}                → 管理者か
 
    ⚠️ **試し（/demo）では、このファイルの代わりに 試し/土台.js を読む。**
       ここで外へ出す関数を足したら、**試し/土台.js にも同じ名前で足すこと。**
@@ -155,9 +157,9 @@ export function 席を見張る(部屋, 届いたら){
       座っているあいだは書かない。本を替えた区切り（題と始めの時刻）は、ここで覚えておくだけ。
       ほかの頁へ移る・タブを閉じる・ログアウトは、席を立つだけで記録しない。
       （前は座った瞬間に記録を作り、1分ごとに延ばしていた。閉じただけの回も残っていた） */
-let いま = null;   // { 部屋, 番, 入った, 区切り:[{ 題, 始め }] }
+let いま = null;   // { 部屋, 番, 入った, 区切り:[{ 題, 本, 始め }] }　題が空＝名札に出さない
 
-export async function 座る(部屋, 題, 席の数){
+export async function 座る(部屋, 題, 席の数, 本 = ""){
   await 立つ();
   // ほかのタブで座ったままの自分の席を片づける
   const 今の席ら = await getDocs(collection(db, "rooms", 部屋, "seats"));
@@ -176,22 +178,24 @@ export async function 座る(部屋, 題, 席の数){
       });
     }catch(e){ continue; }
     const 今 = Date.now();
-    いま = { 部屋, 番, 入った:今, 区切り:[{ 題, 始め:今 }] };
+    いま = { 部屋, 番, 入った:今, 区切り:[{ 題, 本, 始め:今 }] };
     return 番;
   }
   throw new Error("満席です");
 }
 
-export async function 題を替える(題){
+export async function 題を替える(題, 本 = ""){
   if(!いま) return;
   await updateDoc(doc(db, "rooms", いま.部屋, "seats", String(いま.番)), { title:題, seen:serverTimestamp() });
-  いま.区切り.push({ 題, 始め:Date.now() });
+  いま.区切り.push({ 題, 本, 始め:Date.now() });
 }
 
 export async function 生きている(){
   if(!いま) return;
   await updateDoc(doc(db, "rooms", いま.部屋, "seats", String(いま.番)), { seen:serverTimestamp() });
 }
+
+export const 題を出さない印 = "（題を出さずに読んだ本）";
 
 /* 席を立つ。記録する＝true は「読み終える」のときだけ。本を替えた区切りごとに1件ずつ書く。
    読了＝{ 題, ページ } を渡すと、読了も1件書く（「この本を最後まで読んだ」に印を付けたとき） */
@@ -203,12 +207,13 @@ export async function 立つ({ 記録する = false, 読了 = null } = {}){
     const 終わり = Date.now();
     席.区切り.forEach((k, i)=>{
       const 次 = 席.区切り[i + 1]?.始め ?? 終わり;
-      書く.push(addDoc(collection(db, "logs"), { uid:私.uid, room:席.部屋, title:k.題,
-        from:Timestamp.fromMillis(k.始め), to:Timestamp.fromMillis(次) }));
+      // ⚠️ 題を出さなかった区切りも、時間は残す（自分の記録にだけ「題を出さずに読んだ本」として）
+      書く.push(addDoc(collection(db, "logs"), { uid:私.uid, room:席.部屋, title:k.題 || 題を出さない印,
+        from:Timestamp.fromMillis(k.始め), to:Timestamp.fromMillis(次), ...(k.本 ? { book:k.本 } : {}) }));
     });
   }
   if(記録する && 読了) 書く.push(addDoc(collection(db, "finishes"),
-    { uid:私.uid, title:読了.題, pages:読了.ページ, at:serverTimestamp() }));
+    { uid:私.uid, title:読了.題, pages:読了.ページ, at:serverTimestamp(), ...(読了.本 ? { book:読了.本 } : {}) }));
   await Promise.all([
     ...書く,
     deleteDoc(doc(db, "rooms", 席.部屋, "seats", String(席.番))).catch(()=>{}),
@@ -233,6 +238,44 @@ export async function 共有を作る(絵, { 題, 分, 場所 }){
   const image = await getDownloadURL(道);
   await setDoc(記録, { uid:私.uid, title:題, minutes:分, place:場所, image, created:serverTimestamp() });
   return `${location.origin}/s/${記録.id}`;
+}
+
+/* ── 本 ──────────────────────────────────
+   入室のときに選ぶ。無ければ申請して仮登録。管理者が承認して本登録（2026-09-29 配信者）。
+   ⚠️ 読めるのは、本登録の本と、自分が申請した本（仮登録も）。管理者は全部 */
+const 状態の名 = { pending:"仮登録", approved:"本登録", rejected:"見送り" };
+function 本に(d){
+  const x = d.data() || {};
+  return { id:d.id, 題:x.title || "", 著:x.author || "", 版元:x.publisher || "", isbn:x.isbn || "",
+    ひとこと:x.note || "", 状態:状態の名[x.status] || x.status, 申請者:x.requestedBy || "" };
+}
+export async function 本らを読む(){
+  const [本登録, 自分の] = await Promise.all([
+    getDocs(query(collection(db, "books"), where("status", "==", "approved"))),
+    getDocs(query(collection(db, "books"), where("requestedBy", "==", 私.uid))),
+  ]);
+  const 表 = new Map();
+  for(const d of [...本登録.docs, ...自分の.docs]) 表.set(d.id, 本に(d));
+  return [...表.values()].filter(b=>b.状態 !== "見送り");
+}
+export async function 本を申請する({ 題, 著, 版元, isbn, ひとこと }){
+  const r = await addDoc(collection(db, "books"), { title:題, author:著, publisher:版元, isbn:isbn || "",
+    note:ひとこと || "", status:"pending", requestedBy:私.uid, created:serverTimestamp() });
+  return { id:r.id, 題, 著, 版元, isbn, ひとこと, 状態:"仮登録", 申請者:私.uid };
+}
+export async function 管理者か(){
+  try{ return (await getDoc(doc(db, "admins", 私.uid))).exists(); }catch{ return false; }
+}
+export async function 申請らを読む(){
+  const s = await getDocs(query(collection(db, "books"), where("status", "==", "pending")));
+  return s.docs.map(本に);
+}
+// 承認（本登録）か見送り。承認のときは、題・著者・出版社を直してから本登録にできる
+export async function 申請を決める(id, 承認, 直し = {}){
+  await updateDoc(doc(db, "books", id), {
+    status:承認 ? "approved" : "rejected", decided:serverTimestamp(),
+    ...(直し.題 ? { title:直し.題 } : {}), ...(直し.著 ? { author:直し.著 } : {}), ...(直し.版元 ? { publisher:直し.版元 } : {}),
+  });
 }
 
 /* ── 記録 ─────────────────────────────── */

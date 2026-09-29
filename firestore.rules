@@ -13,6 +13,9 @@ rules_version = '2';
         rooms/{room}/seats/{席番号}  { uid, title, since, seen }
         logs/{id}            { uid, room, title, from, to }   ← 「読み終える」で終えたときだけ書く
         meta/usage           { day, count }   ← functions だけが書く（アバターを作った回数・全員ぶん）
+        books/{id}           { title, author, publisher, isbn, note, status, requestedBy, created, decided }
+                             ← 本。status は pending（仮登録）／approved（本登録）／rejected（見送り）
+        admins/{uid}         { }  ← 管理者。**Firebase コンソールで足す**（リポジトリにメールや uid を書かない）
         finishes/{id}        { uid, title, pages, at }   ← 「読み終える」で読了の印を付けたとき。本人だけ読める
         shares/{id}          { uid, title, minutes, place, image, created }  ← 読み終えて X に投稿したときの記録。だれでも読める
 
@@ -28,6 +31,37 @@ service cloud.firestore {
     function isSelf(uid) { return request.auth.uid == uid; }
     function validName(n) { return n is string && n.size() >= 1 && n.size() <= 20; }
     function validTitle(t) { return t is string && t.size() >= 1 && t.size() <= 120; }
+    function isAdmin() {
+      return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    function shortText(t, n) { return t is string && t.size() <= n; }
+
+    // 自分が管理者かだけは、本人が確かめられる
+    match /admins/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+    }
+
+    /* 本（2026-09-29 配信者）。入室のときに選ぶ。無ければ利用者が申請して**仮登録**（pending）。
+       **管理者が承認して本登録**（approved）。仮登録の本は、申請した本人と管理者だけが読める
+       （申請した本人は、仮登録のままその題でベンチに座れる） */
+    match /books/{id} {
+      allow read: if signedIn()
+        && (resource.data.status == 'approved' || resource.data.requestedBy == request.auth.uid || isAdmin());
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['title', 'author', 'publisher', 'isbn', 'note', 'status', 'requestedBy', 'created'])
+        && request.resource.data.status == 'pending'
+        && request.resource.data.requestedBy == request.auth.uid
+        && validTitle(request.resource.data.title)
+        && request.resource.data.author is string && request.resource.data.author.size() >= 1 && request.resource.data.author.size() <= 80
+        && request.resource.data.publisher is string && request.resource.data.publisher.size() >= 1 && request.resource.data.publisher.size() <= 80
+        && shortText(request.resource.data.isbn, 20)
+        && shortText(request.resource.data.note, 300)
+        && request.resource.data.created == request.time;
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'title', 'author', 'publisher', 'isbn', 'decided'])
+        && request.resource.data.status in ['approved', 'rejected']
+        && validTitle(request.resource.data.title);
+    }
 
     match /users/{uid} {
       allow read: if signedIn();
@@ -49,7 +83,7 @@ service cloud.firestore {
       function shape() {
         return request.resource.data.keys().hasOnly(['uid', 'title', 'since', 'seen'])
           && request.resource.data.uid == request.auth.uid
-          && validTitle(request.resource.data.title)
+          && shortText(request.resource.data.title, 120)   // 空＝題を名札に出さない
           && request.resource.data.seen == request.time
           && request.resource.data.since is timestamp
           && request.resource.data.since <= request.time;
@@ -68,7 +102,7 @@ service cloud.firestore {
     match /logs/{id} {
       allow read: if signedIn() && resource.data.uid == request.auth.uid;
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['uid', 'room', 'title', 'from', 'to'])
+        && request.resource.data.keys().hasOnly(['uid', 'room', 'title', 'from', 'to', 'book'])
         && request.resource.data.uid == request.auth.uid
         && validTitle(request.resource.data.title)
         && request.resource.data.room is string
@@ -91,7 +125,7 @@ service cloud.firestore {
     match /finishes/{id} {
       allow read: if signedIn() && resource.data.uid == request.auth.uid;
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['uid', 'title', 'pages', 'at'])
+        && request.resource.data.keys().hasOnly(['uid', 'title', 'pages', 'at', 'book'])
         && request.resource.data.uid == request.auth.uid
         && validTitle(request.resource.data.title)
         && request.resource.data.pages is int
@@ -106,7 +140,7 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['uid', 'title', 'minutes', 'place', 'image', 'created'])
         && request.resource.data.uid == request.auth.uid
-        && validTitle(request.resource.data.title)
+        && shortText(request.resource.data.title, 120)   // 空＝題を出さずに読んだ
         && request.resource.data.minutes is int
         && request.resource.data.minutes >= 0 && request.resource.data.minutes < 1440
         && request.resource.data.place is string && request.resource.data.place.size() <= 40

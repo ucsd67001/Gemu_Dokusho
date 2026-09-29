@@ -54,7 +54,7 @@ function 窓を出す(題, 中){
     </div></div>`;
   document.querySelector("#窓 input")?.focus();
 }
-const 窓を閉じる = () =>{ document.getElementById("窓").innerHTML = ""; };
+const 窓を閉じる = () =>{ document.getElementById("窓").innerHTML = ""; 本窓 = null; };   // 本の窓の状態も消す（読み込みのあとで開き直らないように）
 
 // 絵の道（Storage の場所）から URL を引いて、img[data-道] に入れる
 const URLの控え = new Map();
@@ -76,8 +76,8 @@ function 分に(ms){
 }
 
 /* ── 頁の行き来 ─────────────────────────── */
-const 道の頁 = { "":"廊下", "/log":"記録", "/me":"自分" };
-const 頁の道 = { 廊下:"", 記録:"/log", 自分:"/me" };
+const 道の頁 = { "":"廊下", "/log":"記録", "/me":"自分", "/admin":"管理" };
+const 頁の道 = { 廊下:"", 記録:"/log", 自分:"/me", 管理:"/admin" };
 
 // /room/{部屋} で場所を開く。⚠️ /cafe は最初の形の名残り（カフェを開く）
 function 道を読む(){
@@ -128,14 +128,15 @@ function 描く(){
     状態.作ったばかり = false;
     if(a.誤り) 知らせる(a.誤り, true);
   }
-  ({ 廊下, 部屋:部屋の頁, 記録:記録の頁, 自分:自分の頁 }[状態.頁] || 廊下)();
+  if(状態.頁 === "管理" && !状態.管理者) 状態.頁 = "廊下";
+  ({ 廊下, 部屋:部屋の頁, 記録:記録の頁, 自分:自分の頁, 管理:管理の頁 }[状態.頁] || 廊下)();
 }
 
 function 帯を描く(){
   const 入った = 状態.私 && 状態.自分?.アバター?.座る;
   document.getElementById("nav").innerHTML = 入った ? [
     // 「自分」は外した。右の顔と名前のボタンが自分のページへの入口（2026-09-29 配信者）
-    ["廊下", "場所"], ["記録", "記録"],
+    ["廊下", "場所"], ["記録", "記録"], ...(状態.管理者 ? [["管理", "管理"]] : []),
   ].map(([頁, 字])=>`<button class="${状態.頁 === 頁 || (頁 === "廊下" && 状態.頁 === "部屋") ? "いま" : ""}"
       data-する="行く" data-頁="${頁}">${字}</button>`).join("") : "";
   const 右 = document.getElementById("帯の右");
@@ -419,7 +420,7 @@ function 部屋を描き直す(){
     const 下段 = 席.隣 && 座られた.has(席.相方) ? "下段" : "";
     // tabindex：スマホでは押すと全文が出る（:focus）。パソコンは指を乗せると出る（:hover）
     return `<div class="名の札 ${s.uid === 状態.私.uid ? "自分" : ""} ${下段}" style="${置き(席)}" tabindex="0">
-      <b>${逃(状態.人々.get(s.uid)?.名 || "…")}</b><span>『${逃(s.題)}』</span></div>`;
+      <b>${逃(状態.人々.get(s.uid)?.名 || "…")}</b>${s.題 ? `<span>『${逃(s.題)}』</span>` : ""}</div>`;
   }).join("");
   絵を入れる(舞台);
 
@@ -435,7 +436,7 @@ function 部屋を描き直す(){
     const 人 = 状態.人々.get(s.uid);
     return `<div class="居る">${顔の絵(人, "中")}
       <span class="名">${逃(人?.名 || "…")}</span>
-      <span class="題">『${逃(s.題)}』</span>
+      <span class="題">${s.題 ? `『${逃(s.題)}』` : `<span class="注">（題は出していません）</span>`}</span>
       <span class="時">${分に(Date.now() - s.入った)}</span></div>`;
   }).join("") : `<p class="注">まだ誰もいません。</p>`;
   絵を入れる(列);
@@ -474,10 +475,10 @@ function 手もとを描く(){
       <button class="釦" data-する="席に着く">ベンチに座る</button></div>`;
     return;
   }
-  const 題 = 状態.席ら.find(s=>s.uid === 状態.私.uid)?.題 || 前の題();
+  const 題 = 状態.席ら.find(s=>s.uid === 状態.私.uid)?.題 ?? "";
   el.innerHTML = `<div class="手もと">
     ${顔の絵(状態.自分, "中")}
-    <div class="何を"><div class="書名">『${逃(題)}』</div>
+    <div class="何を"><div class="書名">${題 ? `『${逃(題)}』` : "題は名札に出していません"}</div>
       <div class="時">読みはじめて ${分に(Date.now() - 席.入った)}</div></div>
     <div class="釦たち">
       <button class="釦 枠だけ 小" data-する="本を替える">本を替える</button>
@@ -486,22 +487,115 @@ function 手もとを描く(){
   絵を入れる(el);
 }
 
-const 前の題 = () =>{ try{ return localStorage.getItem("gemuの前の題") || ""; }catch{ return ""; } };
+/* ── 本の窓 ─────────────────────────────
+   入室（と本を替える）のとき（2026-09-29 配信者）：
+     1. 題を名札に出すか、出さないかを選ぶ
+     2. 出すなら、登録済みの本から選ぶ（書名か著者名で絞り込む）
+     3. 無ければ申請する。申請した本は**仮登録**。**申請した本人は、仮登録のままその題で座れる**。
+        管理者が承認すると**本登録**になり、みんなが選べるようになる
+   ⚠️ 前は題を自由に打ち込んでいた。同じ本が表記ゆれで別の本になるのを防ぐため、登録済みから選ぶ形にした */
+let 本窓 = null;   // { やること, 出す, 本ら, 選んだ, 探す, 申請, 送信中 }
+const 前の本 = () =>{ try{ return localStorage.getItem("gemuの前の本") || ""; }catch{ return ""; } };
+const 本の見出し = b => `${b.著}${b.状態 === "仮登録" ? "（仮登録）" : ""}`;
 
-function 題の窓(やること){
-  窓を出す(やること === "席に着く" ? "いま読む本" : "本を替える", `
-    <label class="名札" for="題の欄">本の題</label>
-    <input id="題の欄" class="欄" maxlength="120" placeholder="例：銀河鉄道の夜" value="${逃(前の題())}">
-    <p class="注">ベンチの名札に出ます。</p>
-    <div class="釦たち" style="margin-top:22px">
-      <button class="釦 全幅" data-する="題を決める" data-やること="${逃(やること)}">${やること === "席に着く" ? "席に着く" : "替える"}</button>
-    </div>`);
-  const 欄 = document.getElementById("題の欄");
-  欄.select();
-  欄.addEventListener("keydown", e=>{
-    if(e.key === "Enter" && !e.isComposing) document.querySelector("[data-する=題を決める]").click();
-  });
+async function 題の窓(やること){
+  const w = 本窓 = { やること, 出す:true, 本ら:null, 選んだ:null, 探す:"", 申請:false, 送信中:false };
+  本の窓を描く();
+  let 本ら;
+  try{ 本ら = await 土台.本らを読む(); }
+  catch(e){ console.error(e); 本ら = []; }
+  // ⚠️ 読み終える前に窓が閉じられた（先に座った・✕を押した）なら、何もしない
+  if(本窓 !== w) return;
+  w.本ら = 本ら;
+  w.選んだ = 本ら.find(b=>b.id === 前の本()) || null;
+  本の窓を描く();
 }
+
+function 本の候補(){
+  const w = 本窓;
+  if(w.本ら === null) return 待ちの画面("本棚を読んでいます");
+  const 語 = w.探す.trim().toLowerCase();
+  const 候補 = w.本ら.filter(b=>!語 || (b.題 + " " + b.著).toLowerCase().includes(語))
+    .sort((a, b)=>a.題.localeCompare(b.題, "ja")).slice(0, 50);
+  if(!候補.length) return `<p class="注">見つかりません。</p>`;
+  return 候補.map(b=>`<button class="本の候補の札 ${w.選んだ?.id === b.id ? "いま" : ""}" data-する="本を選ぶ" data-本="${逃(b.id)}">
+    <b>『${逃(b.題)}』</b><span>${逃(本の見出し(b))}</span></button>`).join("");
+}
+
+function 本の窓を描く(){
+  const w = 本窓;
+  if(!w) return;
+  const 座る = w.やること === "席に着く";
+  if(w.申請) return 窓を出す("本の登録を申請する", `
+    <p class="窓の文" style="font-size:14px">一覧に無い本を教えてください。管理者が確かめてから<b>本登録</b>にします。
+      それまでは<b>仮登録</b>ですが、申請したあなたは、この題ですぐに${座る ? "座れます" : "替えられます"}。</p>
+    <label class="名札" for="申題">書名（必須）</label>
+    <input id="申題" class="欄" maxlength="120" value="${逃(w.探す)}">
+    <label class="名札" for="申著">著者名（必須）</label>
+    <input id="申著" class="欄" maxlength="80">
+    <label class="名札" for="申版元">出版社名（必須）</label>
+    <input id="申版元" class="欄" maxlength="80">
+    <label class="名札" for="申isbn">ISBN（わかれば）</label>
+    <input id="申isbn" class="欄" maxlength="20" inputmode="numeric" placeholder="9784…">
+    <label class="名札" for="申ひとこと">ひとこと（任意）</label>
+    <input id="申ひとこと" class="欄" maxlength="300" placeholder="例）文庫版です">
+    <p class="注">書名だけでは別の本と取り違えるので、著者名と出版社名もお願いしています。</p>
+    <div class="釦たち" style="margin-top:20px">
+      <button class="釦 全幅" data-する="申請して決める" ${w.送信中 ? "disabled" : ""}>${w.送信中 ? "送っています…" : 座る ? "申請して、この本で座る" : "申請して、この本に替える"}</button>
+      <button class="釦 枠だけ 全幅" data-する="申請をとじる">一覧に戻る</button>
+    </div>`);
+  窓を出す(座る ? "いま読む本" : "本を替える", `
+    <div class="出すか">
+      <label><input type="radio" name="出すか" value="出す" ${w.出す ? "checked" : ""}> 読んでいる本の題を、名札に出す</label>
+      <label><input type="radio" name="出すか" value="伏せる" ${w.出す ? "" : "checked"}> 題は出さない（名札は名前だけ）</label>
+    </div>
+    ${w.出す ? `
+      <label class="名札" for="本をさがす">本をさがす</label>
+      <input id="本をさがす" class="欄" placeholder="書名か著者名" value="${逃(w.探す)}" autocomplete="off">
+      <div class="本の候補" id="本の候補">${本の候補()}</div>
+      <p class="注">一覧に無いときは、<a data-する="申請をひらく">本の登録を申請する</a></p>` : ""}
+    <div class="釦たち" style="margin-top:20px">
+      <button class="釦 全幅" data-する="題を決める" ${w.出す && !w.選んだ ? "disabled" : ""}>${座る ? "ベンチに座る" : "替える"}</button>
+    </div>`);
+}
+
+async function 本で決める(el){
+  const w = 本窓;
+  if(!w) return;
+  if(w.出す && !w.選んだ) return 知らせる("本を選んでください", true);
+  const 題 = w.出す ? w.選んだ.題 : "", 本 = w.出す ? w.選んだ.id : "";
+  try{ if(本) localStorage.setItem("gemuの前の本", 本); }catch{}
+  if(el) el.disabled = true;
+  try{
+    if(w.やること === "席に着く") await 土台.座る(状態.部屋, 題, 部屋ら[状態.部屋].席.length, 本);
+    else await 土台.題を替える(題, 本);
+    本窓 = null;
+    窓を閉じる();
+    手もとを描く();
+  }catch(e){
+    console.error(e);
+    if(el) el.disabled = false;
+    if(e.message === "満席です"){
+      本窓 = null;
+      窓を閉じる();
+      手もとを描く();
+      知らせる("ちょうど今、最後のベンチが埋まりました。空いたら、お知らせします", true);
+    }else 知らせる("席に着けませんでした", true);
+  }
+}
+
+// 本をさがす欄は、打つたびに候補だけを描き直す（窓ごと描き直すと、打っている字の位置が飛ぶ）
+document.addEventListener("input", e=>{
+  if(e.target.id !== "本をさがす" || !本窓) return;
+  本窓.探す = e.target.value;
+  const 候補 = document.getElementById("本の候補");
+  if(候補) 候補.innerHTML = 本の候補();
+});
+document.addEventListener("change", e=>{
+  if(e.target.name !== "出すか" || !本窓) return;
+  本窓.出す = e.target.value === "出す";
+  本の窓を描く();
+});
 
 /* ── 記録 ─────────────────────────────── */
 async function 記録の頁(){
@@ -553,6 +647,53 @@ async function 記録の頁(){
           : `<p class="注">まだありません。ベンチに座ると、ここに残ります。</p>`}
       </div>
     </section>`;
+}
+
+/* ── 管理（本の申請を承認する） ───────────────────
+   管理者（Firebase コンソールで admins/{uid} を足した人）だけに出る（2026-09-29 配信者）。
+   承認すると本登録（みんなが選べる）。見送ると、申請した本人の一覧からも消える。
+   承認の前に、書名・著者名・出版社名を直せる（表記をそろえるため） */
+async function 管理の頁(){
+  画面.innerHTML = `
+  <section class="幕">
+    <p class="英字の札">Admin</p>
+    <h1 class="中見出し">本の申請</h1>
+    <p class="導き">仮登録の本です。確かめて、本登録にするか見送るかを決めてください。</p>
+    <div id="申請の列">${待ちの画面("読んでいます")}</div>
+  </section>`;
+  let 申請ら;
+  try{ 申請ら = await 土台.申請らを読む(); }catch(e){ console.error(e); 申請ら = null; }
+  const 列 = document.getElementById("申請の列");
+  if(!列) return;
+  if(!申請ら) return 列.innerHTML = `<p class="誤りの字">読めませんでした。</p>`;
+  if(!申請ら.length) return 列.innerHTML = `<p class="注" style="margin-top:24px">いま、申請はありません。</p>`;
+  列.innerHTML = `<div class="申請の列">${申請ら.map(b=>`
+    <div class="申請">
+      <div class="申請の素性">申請：${逃(状態.人々.get(b.申請者)?.名 || "（名前なし）")}
+        ${b.isbn ? `／ISBN ${逃(b.isbn)}` : ""}${b.ひとこと ? `／「${逃(b.ひとこと)}」` : ""}</div>
+      <label class="名札">書名</label><input class="欄" id="管題-${逃(b.id)}" maxlength="120" value="${逃(b.題)}">
+      <label class="名札">著者名</label><input class="欄" id="管著-${逃(b.id)}" maxlength="80" value="${逃(b.著)}">
+      <label class="名札">出版社名</label><input class="欄" id="管版元-${逃(b.id)}" maxlength="80" value="${逃(b.版元)}">
+      <div class="釦たち" style="margin-top:14px">
+        <button class="釦 小" data-する="申請を承認" data-本="${逃(b.id)}">本登録にする</button>
+        <button class="釦 小 枠だけ" data-する="申請を見送る" data-本="${逃(b.id)}">見送る</button>
+      </div>
+    </div>`).join("")}</div>`;
+}
+
+async function 申請を決める(el, 承認){
+  const id = el.dataset.本;
+  const 値 = k => document.getElementById(`${k}-${id}`)?.value.trim() || "";
+  el.disabled = true;
+  try{
+    await 土台.申請を決める(id, 承認, { 題:値("管題"), 著:値("管著"), 版元:値("管版元") });
+    知らせる(承認 ? "本登録にしました" : "見送りました");
+    管理の頁();
+  }catch(e){
+    console.error(e);
+    el.disabled = false;
+    知らせる("決められませんでした", true);
+  }
 }
 
 /* ── 自分 ─────────────────────────────── */
@@ -661,26 +802,37 @@ const 動き = {
   },
   席に着く: ()=>満席か() ? 知らせる("いまは満席です。空いたら、お知らせします", true) : 題の窓("席に着く"),
   本を替える: ()=>題の窓("本を替える"),
-  題を決める: async el=>{
-    const 題 = document.getElementById("題の欄").value.trim();
-    if(!題) return 知らせる("本の題を入れてください", true);
-    try{ localStorage.setItem("gemuの前の題", 題); }catch{}
-    el.disabled = true;
+  題を決める: el=>本で決める(el),
+  本を選ぶ: el=>{
+    本窓.選んだ = 本窓.本ら.find(b=>b.id === el.dataset.本) || null;
+    本の窓を描く();
+  },
+  申請をひらく: ()=>{ 本窓.申請 = true; 本の窓を描く(); document.getElementById("申題")?.focus(); },
+  申請をとじる: ()=>{ 本窓.申請 = false; 本の窓を描く(); },
+  申請して決める: async ()=>{
+    const 値 = id => document.getElementById(id)?.value.trim() || "";
+    const 申 = { 題:値("申題"), 著:値("申著"), 版元:値("申版元"), isbn:値("申isbn").replace(/[^0-9Xx]/g, ""), ひとこと:値("申ひとこと") };
+    if(!申.題 || !申.著 || !申.版元) return 知らせる("書名・著者名・出版社名を入れてください", true);
+    本窓.送信中 = true;
+    本の窓を描く();
     try{
-      if(el.dataset.やること === "席に着く") await 土台.座る(状態.部屋, 題, 部屋ら[状態.部屋].席.length);
-      else await 土台.題を替える(題);
-      窓を閉じる();
-      手もとを描く();
+      const 本 = await 土台.本を申請する(申);
+      本窓.本ら.push(本);
+      本窓.選んだ = 本;
+      本窓.出す = true;
+      本窓.申請 = false;
+      本窓.送信中 = false;
+      知らせる("申請しました。いまは仮登録です");
+      await 本で決める(null);
     }catch(e){
       console.error(e);
-      el.disabled = false;
-      if(e.message === "満席です"){
-        窓を閉じる();
-        手もとを描く();
-        知らせる("ちょうど今、最後のベンチが埋まりました。空いたら、お知らせします", true);
-      }else 知らせる("席に着けませんでした", true);
+      本窓.送信中 = false;
+      本の窓を描く();
+      知らせる("申請できませんでした", true);
     }
   },
+  申請を承認: el=>申請を決める(el, true),
+  申請を見送る: el=>申請を決める(el, false),
   読み終える: ()=>読み終える窓(),
   // ⚠️ 2026-09-27 に行の範囲で消したとき、これまで消えていた（「投稿しないで終える」が効かなかった）
   そのまま終える: ()=>終える(),
@@ -688,7 +840,7 @@ const 動き = {
     el.disabled = true;
     el.textContent = "投稿の準備をしています…";
     const { 題, 分, 場所 } = 読み終えの中身;
-    const 文 = `『${題}』を${分}分、${場所}のベンチで読みました。`;
+    const 文 = 題 ? `『${題}』を${分}分、${場所}のベンチで読みました。` : `${場所}のベンチで、${分}分読みました。`;
     const スマホ = matchMedia("(pointer: coarse)").matches;
     // パソコン：窓は押した瞬間に開く（絵を置き終わってから開くと、ポップアップとして止められる）
     const 窓 = スマホ ? null : open("", "_blank");
@@ -723,14 +875,15 @@ let 読み終えの絵 = null, 読み終えの中身 = null;
 function 読み終える窓(){
   const 席 = 土台.座っている();
   if(!席) return 終える();
-  const 題 = 状態.席ら.find(s=>s.uid === 状態.私.uid)?.題 || 前の題();
+  const 題 = 状態.席ら.find(s=>s.uid === 状態.私.uid)?.題 ?? "";
+  const 本 = 席.区切り?.at(-1)?.本 || "";
   const 分 = Math.max(1, Math.round((Date.now() - 席.入った) / 60000));
   const 場所 = 部屋ら[状態.部屋].名;
   読み終えの絵 = null;
-  読み終えの中身 = { 題, 分, 場所 };
+  読み終えの中身 = { 題, 本, 分, 場所 };
   窓を出す("読み終える", `
-    <p class="窓の文">『${逃(題)}』を、${逃(場所)}のベンチで <b>${分}分</b> 読みました。</p>
-    <label class="読了の印"><input type="checkbox" id="読了の印"> この本を最後まで読んだ（読了）</label>
+    <p class="窓の文">${題 ? `『${逃(題)}』を、` : ""}${逃(場所)}のベンチで <b>${分}分</b> 読みました。</p>
+    ${題 ? `<label class="読了の印"><input type="checkbox" id="読了の印"> この本を最後まで読んだ（読了）</label>` : ""}
     <div id="総ページの欄" hidden>
       <label class="名札" for="総ページ">この本の総ページ数（わかれば）</label>
       <input id="総ページ" class="欄" type="number" inputmode="numeric" min="0" max="20000" placeholder="例：320">
@@ -761,7 +914,7 @@ function 読み終える窓(){
 function 読了を読む(){
   if(!document.getElementById("読了の印")?.checked || !読み終えの中身) return null;
   const ページ = Math.max(0, Math.min(20000, Math.round(Number(document.getElementById("総ページ")?.value) || 0)));
-  return { 題:読み終えの中身.題, ページ };
+  return { 題:読み終えの中身.題, ページ, 本:読み終えの中身.本 };
 }
 
 async function 終える(){
@@ -843,8 +996,8 @@ async function 共有の絵を描く(題, 分, 場所){
     g.font = '600 17px "Hiragino Sans","Yu Gothic UI","Yu Gothic",sans-serif';
     const 名の幅 = Math.min(g.measureText(名).width, 260);
     g.font = '400 17px "Zen Old Mincho", serif';
-    const 題の文 = 詰める(g, `『${題}』`, 260);
-    const 幅 = Math.max(名の幅, g.measureText(題の文).width) + 24, 丈 = 56;
+    const 題の文 = 題 ? 詰める(g, `『${題}』`, 260) : "";
+    const 幅 = Math.max(名の幅, 題の文 ? g.measureText(題の文).width : 0) + 24, 丈 = 題の文 ? 56 : 34;
     const 左 = Math.max(8, Math.min(W - 幅 - 8, 中 - 幅 / 2));
     g.fillStyle = "rgba(255,253,255,.94)";
     g.fillRect(左, 上, 幅, 丈);
@@ -868,10 +1021,10 @@ async function 共有の絵を描く(題, 分, 場所){
   g.textAlign = "left";
   g.fillStyle = "#17141f";
   g.font = '600 42px "Zen Old Mincho", serif';
-  g.fillText(詰める(g, `『${題}』`, W - 80), 40, 66);
+  g.fillText(題 ? 詰める(g, `『${題}』`, W - 80) : `${分}分、読みました`, 40, 66);
   g.fillStyle = "#59526b";
   g.font = '400 24px "Zen Old Mincho", serif';
-  g.fillText(`${場所}のベンチで、${分}分読みました`, 40, 110);
+  g.fillText(題 ? `${場所}のベンチで、${分}分読みました` : `${場所}のベンチで`, 40, 110);
   g.textAlign = "right";
   g.fillStyle = "#6b4bc4";
   g.font = '600 18px "Hiragino Sans","Yu Gothic UI","Yu Gothic",sans-serif';
@@ -915,8 +1068,10 @@ document.addEventListener("change", async e=>{
   自分の見張り = 人々の見張り = null;
   状態.起きた = true;
   状態.私 = 私;
-  状態.自分 = undefined; 状態.人々 = new Map();
+  状態.自分 = undefined; 状態.人々 = new Map(); 状態.管理者 = false;
   if(私){
+    // 管理者（admins/{uid}）だけに「管理」を出す。本の申請を承認する頁
+    土台.管理者か().then(か=>{ 状態.管理者 = か; if(か) 描く(); }).catch(()=>{});
     // ⚠️ 今回だけ：9月29日より前の自分の記録を消す（土台.js の 古い記録を消す。二人とも済んだら外す）
     土台.古い記録を消す().then(n=>{ if(n) console.log(`古い記録を ${n} 件消しました`); }).catch(e=>console.error(e));
     自分の見張り = 土台.自分を見張る(自分=>{

@@ -24,6 +24,15 @@ function 初め(){
     人: { [仲間]: { 名:"しおり", アバター:{ 状態:"ready", 座る:`試し:${仲間}:座る`, めくる:`試し:${仲間}:めくる`, 顔:`試し:${仲間}:顔` } } },
     席: { rothenburg: { 1: { uid:仲間, 題:"銀河鉄道の夜", 入った:Date.now() - 23 * 60000, 見た:Date.now() } } },
     記録: [],
+    // 試しの本棚（本登録）。架空の仲間の申請中の本も1冊
+    本: {
+      b1:{ 題:"銀河鉄道の夜", 著:"宮沢賢治", 版元:"新潮社", 状態:"本登録" },
+      b2:{ 題:"モモ", 著:"ミヒャエル・エンデ", 版元:"岩波書店", 状態:"本登録" },
+      b3:{ 題:"はじめての哲学史", 著:"竹田青嗣、西研", 版元:"有斐閣", 状態:"本登録" },
+      b4:{ 題:"こころ", 著:"夏目漱石", 版元:"新潮社", 状態:"本登録" },
+      b5:{ 題:"草枕", 著:"夏目漱石", 版元:"新潮社", 状態:"本登録" },
+      b6:{ 題:"星の王子さま", 著:"サン＝テグジュペリ", 版元:"岩波書店", 状態:"仮登録", 申請者:仲間 },
+    },
   };
 }
 function 読む(){
@@ -136,7 +145,7 @@ export function 席を見張る(部屋, 届いたら){
 }
 
 let いま = null;   // { 部屋, 番, 入った, 区切り }。記録は「読み終える」のときだけ（土台.js と同じ）
-export async function 座る(部屋, 題, 席の数){
+export async function 座る(部屋, 題, 席の数, 本 = ""){
   await 立つ();
   const s = 読む();
   const 席ら = s.席[部屋] ||= {};
@@ -146,17 +155,17 @@ export async function 座る(部屋, 題, 席の数){
     if(x && x.uid !== 私.uid && 生きた席(x)) continue;
     席ら[番] = { uid:私.uid, 題, 入った:Date.now(), 見た:Date.now() };
     書く(s);
-    いま = { 部屋, 番, 入った:Date.now(), 区切り:[{ 題, 始め:Date.now() }] };
+    いま = { 部屋, 番, 入った:Date.now(), 区切り:[{ 題, 本, 始め:Date.now() }] };
     return 番;
   }
   throw new Error("満席です");
 }
-export async function 題を替える(題){
+export async function 題を替える(題, 本 = ""){
   if(!いま) return;
   const s = 読む();
   const 席 = s.席[いま.部屋]?.[いま.番];
   if(席){ 席.題 = 題; 席.見た = Date.now(); }
-  いま.区切り.push({ 題, 始め:Date.now() });
+  いま.区切り.push({ 題, 本, 始め:Date.now() });
   書く(s);
 }
 export async function 生きている(){
@@ -173,7 +182,7 @@ export async function 立つ({ 記録する = false, 読了 = null } = {}){
   if(記録する){
     const 終わり = Date.now();
     いま.区切り.forEach((k, i)=>{
-      s.記録.push({ id:Math.random().toString(36).slice(2), uid:私.uid, 部屋:いま.部屋, 題:k.題,
+      s.記録.push({ id:Math.random().toString(36).slice(2), uid:私.uid, 部屋:いま.部屋, 題:k.題 || 題を出さない印,
         始め:k.始め, 終わり:いま.区切り[i + 1]?.始め ?? 終わり });
     });
   }
@@ -184,6 +193,32 @@ export async function 立つ({ 記録する = false, 読了 = null } = {}){
 export const 座っている = () => いま ? { ...いま } : null;
 
 export async function 古い記録を消す(){ return 0; }
+export const 題を出さない印 = "（題を出さずに読んだ本）";
+// 本（土台.js と同じ形）。試しの人は管理者でもある（管理の頁を試すため）
+const 本ら = s => Object.entries(s.本 ||= {}).map(([id, x])=>({ id, 題:x.題, 著:x.著, 版元:x.版元 || "",
+  isbn:x.isbn || "", ひとこと:x.ひとこと || "", 状態:x.状態, 申請者:x.申請者 || "" }));
+export async function 本らを読む(){
+  return 本ら(読む()).filter(b=>b.状態 === "本登録" || (b.状態 === "仮登録" && b.申請者 === 私.uid));
+}
+export async function 本を申請する({ 題, 著, 版元, isbn, ひとこと }){
+  const s = 読む();
+  const id = "b" + Math.random().toString(36).slice(2, 8);
+  (s.本 ||= {})[id] = { 題, 著, 版元, isbn, ひとこと, 状態:"仮登録", 申請者:私.uid };
+  書く(s);
+  return { id, 題, 著, 版元, isbn, ひとこと, 状態:"仮登録", 申請者:私.uid };
+}
+export async function 管理者か(){ return true; }
+export async function 申請らを読む(){ return 本ら(読む()).filter(b=>b.状態 === "仮登録"); }
+export async function 申請を決める(id, 承認, 直し = {}){
+  const s = 読む();
+  const b = s.本?.[id];
+  if(!b) return;
+  b.状態 = 承認 ? "本登録" : "見送り";
+  if(直し.題) b.題 = 直し.題;
+  if(直し.著) b.著 = 直し.著;
+  if(直し.版元) b.版元 = 直し.版元;
+  書く(s);
+}
 export async function 読了を読む(){
   return (読む().読了 || []).filter(x=>x.uid === 私.uid).map(({ 題, ページ, いつ })=>({ 題, ページ, いつ }));
 }

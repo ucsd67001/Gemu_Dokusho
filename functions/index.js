@@ -300,7 +300,8 @@ export const sharePage = onRequest({ region: "asia-northeast1" }, async (req, re
   const d = id ? (await db.doc(`shares/${id}`).get()).data() : null;
   if(!d){ res.redirect(302, "/"); return; }
   const 逃 = t => String(t ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
-  const 題 = `『${d.title}』を${d.minutes}分、${d.place}のベンチで読みました`;
+  const 題 = d.title ? `『${d.title}』を${d.minutes}分、${d.place}のベンチで読みました`
+    : `${d.place}のベンチで、${d.minutes}分読みました`;   // 題を名札に出さなかった人
   const 説明 = "家にいながら、景色のいい場所で読む。GEMuの静かな読書会";
   // Hosting から回ってくると、hostname は裏の処理の名前になる。元の名前は x-forwarded-host
   const ここ = `https://${req.get("x-forwarded-host") || req.hostname}/s/${id}`;
