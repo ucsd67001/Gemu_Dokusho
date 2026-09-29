@@ -283,6 +283,25 @@ h2.節見出し{font-size:17px;font-weight:600;letter-spacing:.09em;margin:0}
 .窓の中{padding:14px 26px 26px}
 .窓の中 .名札:first-child{margin-top:6px}
 
+/* 読み終える窓の、読了の印 */
+.読了の印{display:flex;align-items:center;gap:10px;font-family:var(--ゴシック);font-size:13px;
+  color:var(--字);margin:4px 0 6px;cursor:pointer}
+.読了の印 input{width:16px;height:16px;accent-color:var(--灯)}
+#総ページの欄{margin-bottom:14px}
+#総ページの欄 .名札{margin-top:8px}
+
+/* 読み方は、人それぞれ。3つの列を罫で仕切って横に並べる。順位の数字は付けない */
+.読み方{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--罫);margin-top:18px}
+.読み方 .待つ{grid-column:1 / -1;padding:24px 0}
+.読み方の列{padding:16px 18px 18px;border-left:1px solid var(--罫のごく薄い)}
+.読み方の列:first-child{border-left:none;padding-left:0}
+.読み方の列 h3{font-size:14px;font-weight:600;letter-spacing:.08em;margin:0 0 10px}
+.読み方の人{display:flex;align-items:center;gap:10px;padding:6px 0}
+.読み方の人 .名{flex:1;min-width:0;font-family:var(--ゴシック);font-size:12.5px;font-weight:600;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.読み方の人 .数{font-family:var(--ゴシック);font-size:12px;color:var(--字の薄い);white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+
 /* 読み終える窓 */
 .窓の文{margin:0 0 12px;font-size:15px;line-height:1.9}
 .窓の文 b{font-weight:600}
@@ -319,6 +338,9 @@ h2.節見出し{font-size:17px;font-weight:600;letter-spacing:.09em;margin:0}
   .記録 .日{grid-column:1 / -1}
   .名の札{max-width:14cqi}
   .三枚{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .読み方{grid-template-columns:1fr}
+  .読み方の列{border-left:none;padding-left:0;border-top:1px solid var(--罫のごく薄い)}
+  .読み方の列:first-child{border-top:none}
   .数字{padding:14px 10px 15px}
   .数字 .値{font-size:21px}
 }

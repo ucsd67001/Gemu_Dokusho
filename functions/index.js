@@ -13,6 +13,7 @@
                    （向きを記録する前に作ったアバターのため。画面が一度だけ呼ぶ）
      borrowImages  アバターの絵を data URL で返す（読み終えたときの X 用の絵を、画面の canvas で描くため）
      sharePage     読書の記録ページ /s/{id}。X がリンクから絵（og:image）を読み取って、投稿に大きく出す
+     readerStats   「読み方は、人それぞれ」：読了した冊数・読了した本の総ページ数・読んだ時間の、それぞれ上位3人
 
    ⚠️⚠️ **写真はどこにも残さない。**受け取って OpenAI に渡すだけ。
       残すのは出来上がった絵（Storage の avatars/{uid}/{版}/）だけ。
@@ -325,6 +326,42 @@ main{width:min(1080px,100% - 32px);margin:40px auto}img{width:100%;border:1px so
 p{margin:18px 0 0}a{color:#513397}</style></head>
 <body><main><img src="${逃(d.image)}" alt="${逃(題)}"><p>${逃(題)}</p>
 <p><a href="/">GEMuの静かな読書会</a> ― 家にいながら、景色のいい場所で読む。</p></main></body></html>`);
+});
+
+/* ── 読み方は、人それぞれ ─────────────────────────
+   2026-09-29 配信者：競わせはしないが、参考として「冊数が多い人」「ページ数が多い人」「時間が長い人」を出す。
+   志向が違う人がいる、と伝えるため。期間は**これまで全部**。
+   ⚠️ 記録（logs・finishes）は本人しか読めない決まりのまま。ここで全員分を数え、**上位3人の名前・顔・数だけ**を返す。
+   ⚠️ 人数が少ないうちは、呼ばれるたびに全部を数え直す。記録が数万件を超えたら、書かれたときに足し込む形（トリガー）に替える */
+export const readerStats = onCall({ region: "asia-northeast1" }, async req => {
+  if(!req.auth) throw new HttpsError("unauthenticated", "ログインしてください");
+  const [logs, fins, users] = await Promise.all([
+    db.collection("logs").select("uid", "from", "to").get(),
+    db.collection("finishes").select("uid", "pages").get(),
+    db.collection("users").get(),
+  ]);
+  const 計 = new Map();
+  const 足す = (uid, k, v) => {
+    if(!uid) return;
+    const x = 計.get(uid) || { books: 0, pages: 0, minutes: 0 };
+    x[k] += v;
+    計.set(uid, x);
+  };
+  logs.forEach(d => {
+    const x = d.data();
+    const ms = (x.to?.toMillis?.() || 0) - (x.from?.toMillis?.() || 0);
+    if(ms > 0) 足す(x.uid, "minutes", ms / 60000);
+  });
+  fins.forEach(d => {
+    const x = d.data();
+    足す(x.uid, "books", 1);
+    足す(x.uid, "pages", Number(x.pages) || 0);
+  });
+  const 人 = new Map(users.docs.map(d => [d.id, d.data()]));
+  const 上位 = k => [...計].filter(([uid, v]) => Math.round(v[k]) > 0 && 人.has(uid))
+    .sort((a, b) => b[1][k] - a[1][k]).slice(0, 3)
+    .map(([uid, v]) => ({ uid, name: 人.get(uid).name || "", face: 人.get(uid).avatar?.face || "", value: Math.round(v[k]) }));
+  return { books: 上位("books"), pages: 上位("pages"), minutes: 上位("minutes") };
 });
 
 /* ── 道具 ─────────────────────────────── */

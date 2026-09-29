@@ -260,7 +260,13 @@ function 廊下(){
         <span class="釦 小 枠だけ 入口の釦" id="札-${id}">ここで読む →</span>
       </button>`).join("")}
     </div>
+  </section>
+  <section class="節">
+    <div class="節の頭"><h2 class="節見出し">読み方は、人それぞれ</h2><p class="節の添え">これまでの全部</p></div>
+    <p class="注">競うものではありません。たくさんの本を読む人、厚い本を読む人、長い時間をかける人。いろいろな読み方の人がいます。</p>
+    <div class="読み方" id="読み方">${待ちの画面("数えています")}</div>
   </section>`;
+  読み方を描く();
   // 誰がいるかを出す
   for(const [id, 部屋] of 出す部屋ら()){
     片づけ.push(土台.席を見張る(id, 席ら=>{
@@ -281,6 +287,29 @@ function 廊下(){
       }
     }));
   }
+}
+
+/* 読み方は、人それぞれ（2026-09-29 配信者）。
+   ⚠️ 順位の数字は付けない。3つの列を横に並べ、どれが上ということもない形にする */
+async function 読み方を描く(){
+  let r;
+  try{ r = await 土台.読み方を読む(); }catch(e){ console.error(e); r = null; }
+  const 置き場 = document.getElementById("読み方");
+  if(!置き場) return;
+  if(!r) return 置き場.innerHTML = `<p class="注">いまは数えられませんでした。</p>`;
+  const 時間に = 分 => 分 >= 60 ? `${Math.floor(分 / 60)}時間${分 % 60 ? (分 % 60) + "分" : ""}` : `${分}分`;
+  const 列 = (見出し, 人ら, 単位) => `
+    <div class="読み方の列">
+      <h3>${見出し}</h3>
+      ${人ら.length ? 人ら.map(x=>`<div class="読み方の人">${顔の絵({ アバター:{ 顔:x.顔 } }, "中")}
+        <span class="名">${逃(x.名)}</span><span class="数">${単位(x.数)}</span></div>`).join("")
+        : `<p class="注">まだだれもいません</p>`}
+    </div>`;
+  置き場.innerHTML =
+    列("たくさんの本を", r.冊, n=>`${n}冊`) +
+    列("たくさんのページを", r.ページ, n=>`${n.toLocaleString()}ページ`) +
+    列("長い時間を", r.分, 時間に);
+  絵を入れる(置き場);
 }
 
 /* ── 部屋 ─────────────────────────────── */
@@ -484,7 +513,8 @@ async function 記録の頁(){
     <div id="記録の中">${待ちの画面("読みこんでいます")}</div>
   </section>`;
   let 記録;
-  try{ 記録 = await 土台.記録を読む(); }
+  let 読了ら = [];
+  try{ [記録, 読了ら] = await Promise.all([土台.記録を読む(), 土台.読了を読む().catch(()=>[])]); }
   catch(e){ console.error(e); 記録 = null; }
   const 中 = document.getElementById("記録の中");
   if(!中) return;
@@ -507,6 +537,12 @@ async function 記録の頁(){
       ${数字("7 days", 計(r=>r.始め >= Date.now() - 7 * 86400000))}
       ${数字("All", 計(()=>true))}
     </div>
+    <div class="数字たち" style="margin-top:0;border-top:none">
+      <div class="数字"><div class="名">Books</div><div class="値">${読了ら.length}<small>冊</small></div></div>
+      <div class="数字"><div class="名">Pages</div><div class="値">${読了ら.reduce((s, r)=>s + (r.ページ || 0), 0).toLocaleString()}<small>ページ</small></div></div>
+      <div class="数字"></div>
+    </div>
+    <p class="注">冊数とページ数は、「読み終える」で「この本を最後まで読んだ」に印を付けた本だけを数えます。</p>
     <section class="節">
       <div class="節の頭"><h2 class="節見出し">これまで</h2><p class="節の添え">${記録.length}回</p></div>
       <div class="記録の列">
@@ -662,7 +698,7 @@ const 動き = {
     /* 文・ハッシュタグ・リンクのあいだに空の行を1つずつ（2026-09-29 配信者）。
        ⚠️ リンクは url= で渡さず、文に入れる。url= だと X が文のすぐ後ろ（同じ行）につなげる */
     const 先 = "https://x.com/intent/post?text=" + encodeURIComponent(`${文}\n\n#GEMuの静かな読書会\n\n${行き先}`);
-    await 土台.立つ({ 記録する:true }).catch(()=>{});
+    await 土台.立つ({ 記録する:true, 読了:読了を読む() }).catch(()=>{});
     /* スマホ：このページのまま X へ移る（X のアプリが入っていれば、アプリが開く）。
        ⚠️ 絵を置き終わってから新しい窓を開くと、スマホでは止められて、X が立ち上がらなかった（2026-09-27 配信者） */
     if(スマホ){ location.href = 先; return; }
@@ -694,6 +730,11 @@ function 読み終える窓(){
   読み終えの中身 = { 題, 分, 場所 };
   窓を出す("読み終える", `
     <p class="窓の文">『${逃(題)}』を、${逃(場所)}のベンチで <b>${分}分</b> 読みました。</p>
+    <label class="読了の印"><input type="checkbox" id="読了の印"> この本を最後まで読んだ（読了）</label>
+    <div id="総ページの欄" hidden>
+      <label class="名札" for="総ページ">この本の総ページ数（わかれば）</label>
+      <input id="総ページ" class="欄" type="number" inputmode="numeric" min="0" max="20000" placeholder="例：320">
+    </div>
     <div class="共有の見本" id="共有の見本">${待ちの画面("絵を描いています")}</div>
     <p class="窓の文">X に投稿しますか？</p>
     <div class="釦たち" style="margin-top:12px">
@@ -716,9 +757,17 @@ function 読み終える窓(){
 }
 
 // 「読み終える」で終えたときだけ、読んだ時間を記録に残す（2026-09-29 配信者）
+// 読了の印と総ページ数（窓が閉じる前に読む）。冊数とページ数は、ここで印を付けた本だけを数える（2026-09-29 配信者）
+function 読了を読む(){
+  if(!document.getElementById("読了の印")?.checked || !読み終えの中身) return null;
+  const ページ = Math.max(0, Math.min(20000, Math.round(Number(document.getElementById("総ページ")?.value) || 0)));
+  return { 題:読み終えの中身.題, ページ };
+}
+
 async function 終える(){
+  const 読了 = 読了を読む();
   窓を閉じる();
-  await 土台.立つ({ 記録する:true }).catch(()=>{});
+  await 土台.立つ({ 記録する:true, 読了 }).catch(()=>{});
   行く("廊下");
   知らせる("おつかれさまでした");
 }
@@ -835,6 +884,12 @@ document.addEventListener("click", e=>{
   const el = e.target.closest("[data-する]");
   if(!el || el.tagName === "INPUT") return;
   動き[el.dataset.する]?.(el, e);
+});
+// 読了の印を付けたら、総ページ数の欄を出す
+document.addEventListener("change", e=>{
+  if(e.target.id !== "読了の印") return;
+  const 欄 = document.getElementById("総ページの欄");
+  if(欄){ 欄.hidden = !e.target.checked; if(e.target.checked) document.getElementById("総ページ")?.focus(); }
 });
 document.addEventListener("change", async e=>{
   if(e.target.dataset?.する !== "写真") return;

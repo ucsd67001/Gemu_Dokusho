@@ -13,6 +13,7 @@ rules_version = '2';
         rooms/{room}/seats/{席番号}  { uid, title, since, seen }
         logs/{id}            { uid, room, title, from, to }   ← 「読み終える」で終えたときだけ書く
         meta/usage           { day, count }   ← functions だけが書く（アバターを作った回数・全員ぶん）
+        finishes/{id}        { uid, title, pages, at }   ← 「読み終える」で読了の印を付けたとき。本人だけ読める
         shares/{id}          { uid, title, minutes, place, image, created }  ← 読み終えて X に投稿したときの記録。だれでも読める
 
    ⚠️ avatar は**裏の処理（functions）だけが書く。**画面からは name と flip（向きを反対にする）しか変えられない。
@@ -82,6 +83,20 @@ service cloud.firestore {
          画面（土台.js の 古い記録を消す）が、ログインしたときに一度だけ消す。二人とも消し終えたら、この行と画面の処理を外す */
       allow delete: if signedIn() && resource.data.uid == request.auth.uid
         && resource.data.from < timestamp.value(1790607600000);
+    }
+
+    /* 読了（2026-09-29 配信者）。「読み終える」で「この本を最後まで読んだ」に印を付けたときに1件。
+       pages はその本の総ページ数（入れなければ 0）。冊数とページ数を数えるため（functions の readerStats）。
+       ⚠️ 読めるのは本人だけ。全員分の上位3人は readerStats が数えて返す */
+    match /finishes/{id} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['uid', 'title', 'pages', 'at'])
+        && request.resource.data.uid == request.auth.uid
+        && validTitle(request.resource.data.title)
+        && request.resource.data.pages is int
+        && request.resource.data.pages >= 0 && request.resource.data.pages <= 20000
+        && request.resource.data.at == request.time;
     }
 
     /* X に投稿した読書の記録。記録ページ（functions の sharePage）が読む。

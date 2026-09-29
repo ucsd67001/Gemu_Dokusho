@@ -8,6 +8,7 @@
         users/{uid}                 → 人   { 名, 反転, アバター{ 状態, 段階, 座る, めくる, 顔, 背中, 向き, 背中の向き, 誤り } }
         rooms/{room}/seats/{番}     → 席   { 番, uid, 題, 入った, 見た }
         logs/{id}                   → 記録 { 部屋, 題, 始め, 終わり }
+        finishes/{id}               → 読了 { 題, ページ, いつ }
 
    ⚠️ **試し（/demo）では、このファイルの代わりに 試し/土台.js を読む。**
       ここで外へ出す関数を足したら、**試し/土台.js にも同じ名前で足すこと。**
@@ -192,8 +193,9 @@ export async function 生きている(){
   await updateDoc(doc(db, "rooms", いま.部屋, "seats", String(いま.番)), { seen:serverTimestamp() });
 }
 
-/* 席を立つ。記録する＝true は「読み終える」のときだけ。本を替えた区切りごとに1件ずつ書く */
-export async function 立つ({ 記録する = false } = {}){
+/* 席を立つ。記録する＝true は「読み終える」のときだけ。本を替えた区切りごとに1件ずつ書く。
+   読了＝{ 題, ページ } を渡すと、読了も1件書く（「この本を最後まで読んだ」に印を付けたとき） */
+export async function 立つ({ 記録する = false, 読了 = null } = {}){
   if(!いま) return;
   const 席 = いま; いま = null;
   const 書く = [];
@@ -205,6 +207,8 @@ export async function 立つ({ 記録する = false } = {}){
         from:Timestamp.fromMillis(k.始め), to:Timestamp.fromMillis(次) }));
     });
   }
+  if(記録する && 読了) 書く.push(addDoc(collection(db, "finishes"),
+    { uid:私.uid, title:読了.題, pages:読了.ページ, at:serverTimestamp() }));
   await Promise.all([
     ...書く,
     deleteDoc(doc(db, "rooms", 席.部屋, "seats", String(席.番))).catch(()=>{}),
@@ -242,6 +246,18 @@ export async function 古い記録を消す(){
     where("uid", "==", 私.uid), where("from", "<", Timestamp.fromMillis(古い記録の境目)), orderBy("from", "desc")));
   await Promise.all(s.docs.map(d=>deleteDoc(d.ref)));
   return s.size;
+}
+
+export async function 読了を読む(){
+  const s = await getDocs(query(collection(db, "finishes"), where("uid", "==", 私.uid)));
+  return s.docs.map(d=>{ const x = d.data(); return { 題:x.title, ページ:x.pages || 0, いつ:x.at?.toMillis?.() || 0 }; });
+}
+
+// 読み方は、人それぞれ：冊数・ページ数・時間の、それぞれ上位3人（functions の readerStats が数える）
+export async function 読み方を読む(){
+  const r = (await httpsCallable(呼ぶ, "readerStats", { timeout: 30000 })({})).data || {};
+  const 直す = xs => (xs || []).map(x=>({ uid:x.uid, 名:x.name, 顔:x.face, 数:x.value }));
+  return { 冊:直す(r.books), ページ:直す(r.pages), 分:直す(r.minutes) };
 }
 
 export async function 記録を読む(){

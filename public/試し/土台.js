@@ -166,9 +166,10 @@ export async function 生きている(){
   if(席) 席.見た = Date.now();
   書く(s);
 }
-export async function 立つ({ 記録する = false } = {}){
+export async function 立つ({ 記録する = false, 読了 = null } = {}){
   if(!いま) return;
   const s = 読む();
+  if(記録する && 読了) (s.読了 ||= []).push({ uid:私.uid, 題:読了.題, ページ:読了.ページ, いつ:Date.now() });
   if(記録する){
     const 終わり = Date.now();
     いま.区切り.forEach((k, i)=>{
@@ -183,6 +184,21 @@ export async function 立つ({ 記録する = false } = {}){
 export const 座っている = () => いま ? { ...いま } : null;
 
 export async function 古い記録を消す(){ return 0; }
+export async function 読了を読む(){
+  return (読む().読了 || []).filter(x=>x.uid === 私.uid).map(({ 題, ページ, いつ })=>({ 題, ページ, いつ }));
+}
+// 試しでは、この端末の中の記録から数える（架空の仲間にも少し数を持たせる）
+export async function 読み方を読む(){
+  const s = 読む();
+  const 計 = new Map([[仲間, { 冊:3, ページ:820, 分:340 }]]);
+  const 足す = (uid, k, v)=>{ const x = 計.get(uid) || { 冊:0, ページ:0, 分:0 }; x[k] += v; 計.set(uid, x); };
+  for(const r of s.記録) 足す(r.uid, "分", Math.max(0, r.終わり - r.始め) / 60000);
+  for(const r of (s.読了 || [])){ 足す(r.uid, "冊", 1); 足す(r.uid, "ページ", r.ページ || 0); }
+  const 上位 = k => [...計].filter(([uid, v])=>Math.round(v[k]) > 0 && s.人[uid])
+    .sort((a, b)=>b[1][k] - a[1][k]).slice(0, 3)
+    .map(([uid, v])=>({ uid, 名:s.人[uid].名, 顔:s.人[uid].アバター?.顔 || "", 数:Math.round(v[k]) }));
+  return { 冊:上位("冊"), ページ:上位("ページ"), 分:上位("分") };
+}
 export async function 記録を読む(){
   return 読む().記録.filter(x=>x.uid === 私.uid)
     .sort((a, b)=>b.始め - a.始め)
