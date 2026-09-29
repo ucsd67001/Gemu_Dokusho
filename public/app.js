@@ -652,15 +652,16 @@ const 動き = {
     el.disabled = true;
     el.textContent = "投稿の準備をしています…";
     const { 題, 分, 場所 } = 読み終えの中身;
-    const 文 = `『${題}』を${分}分、${場所}のベンチで読みました。
-#GEMuの静かな読書会`;
+    const 文 = `『${題}』を${分}分、${場所}のベンチで読みました。`;
     const スマホ = matchMedia("(pointer: coarse)").matches;
     // パソコン：窓は押した瞬間に開く（絵を置き終わってから開くと、ポップアップとして止められる）
     const 窓 = スマホ ? null : open("", "_blank");
     let 行き先 = location.origin + 根;
     try{ if(読み終えの絵) 行き先 = await 土台.共有を作る(読み終えの絵, { 題, 分, 場所 }); }
     catch(e){ console.error(e); }
-    const 先 = "https://x.com/intent/post?text=" + encodeURIComponent(文) + "&url=" + encodeURIComponent(行き先);
+    /* 文・ハッシュタグ・リンクのあいだに空の行を1つずつ（2026-09-29 配信者）。
+       ⚠️ リンクは url= で渡さず、文に入れる。url= だと X が文のすぐ後ろ（同じ行）につなげる */
+    const 先 = "https://x.com/intent/post?text=" + encodeURIComponent(`${文}\n\n#GEMuの静かな読書会\n\n${行き先}`);
     await 土台.立つ({ 記録する:true }).catch(()=>{});
     /* スマホ：このページのまま X へ移る（X のアプリが入っていれば、アプリが開く）。
        ⚠️ 絵を置き終わってから新しい窓を開くと、スマホでは止められて、X が立ち上がらなかった（2026-09-27 配信者） */
