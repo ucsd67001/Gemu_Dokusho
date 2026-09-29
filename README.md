@@ -198,6 +198,10 @@ FUNCTIONS_DISCOVERY_TIMEOUT=60000 firebase deploy --project gemu-dokusho --only 
 2. Firestore で `admins` というコレクションを作り、**文書 ID をその UID** にする（フィールドは何でもよい。例：`ok` = true）
 3. その人がアプリを開き直すと、メニューに「**管理**」が出る。仮登録の本を、書名などを直してから「本登録にする」か「見送る」
 
+## ファビコン（2026-09-29 配信者の絵）
+`node 04_tools/ファビコンを作る.mjs <絵>` → `public/` に favicon.ico・favicon-32/180/192/512.png。
+外側の白は、**絵の端から続いている白だけ**を抜いて透明にする。iPhone 用（180）は地の色で埋める。元の絵は `04_tools/下書き/favicon.png`（git に入れない）
+
 ## 部屋の絵を差し替える
 
 1. `node 04_tools/部屋を作る.mjs` で `04_tools/下書き/` に何枚か作る

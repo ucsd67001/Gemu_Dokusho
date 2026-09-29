@@ -321,7 +321,7 @@ export const sharePage = onRequest({ region: "asia-northeast1" }, async (req, re
 <meta name="twitter:title" content="GEMuの静かな読書会">
 <meta name="twitter:description" content="${逃(説明)}">
 <meta name="twitter:image" content="${逃(d.image)}">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <style>body{margin:0;background:#f8f6fc;color:#17141f;font-family:"Hiragino Mincho ProN","Yu Mincho",serif;line-height:1.9}
 main{width:min(1080px,100% - 32px);margin:40px auto}img{width:100%;border:1px solid rgba(38,28,66,.13);border-radius:2px}
 p{margin:18px 0 0}a{color:#513397}</style></head>
