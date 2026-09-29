@@ -165,6 +165,14 @@ FUNCTIONS_DISCOVERY_TIMEOUT=60000 firebase deploy --project gemu-dokusho --only 
 - 申請は書名・著者名・出版社名が必須、ISBN とひとことは任意
 - 題を出さなかった人：名札は名前だけ。記録には「（題を出さずに読んだ本）」。読了の印は付けられない。X の文と絵にも題を入れない
 
+### Hongaeshi の本棚を写す（2026-09-29 配信者）
+`node 04_tools/Hongaeshiから写す.mjs` → `public/本棚.json`（書誌だけ。93冊）→ hosting を上げる。
+画面は、これを**本登録の本**として一覧に混ぜる（id は `h-…`）。Firestore には入れていない（こちらの管理用の鍵が無いため）。
+- Hongaeshi の books は**だれでも読める**ので、鍵を使わずに公開の入口（REST）から読む
+- 紹介文（AI の文）と Amazon のリンク（Hongaeshi のアフィリエイトのタグ付き）は写さない
+- ページ数がある本は、読了の印を付けたときに総ページ数がはじめから入る
+- Hongaeshi に本が増えたら、もう一度流して上げ直す
+
 ### 管理者を決める（Firebase コンソールで。**リポジトリにメールや uid を書かない**）
 1. Authentication の「ユーザー」で、管理者にしたい人の **UID** を写す
 2. Firestore で `admins` というコレクションを作り、**文書 ID をその UID** にする（フィールドは何でもよい。例：`ok` = true）

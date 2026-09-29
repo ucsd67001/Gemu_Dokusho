@@ -496,7 +496,7 @@ function 手もとを描く(){
    ⚠️ 前は題を自由に打ち込んでいた。同じ本が表記ゆれで別の本になるのを防ぐため、登録済みから選ぶ形にした */
 let 本窓 = null;   // { やること, 出す, 本ら, 選んだ, 探す, 申請, 送信中 }
 const 前の本 = () =>{ try{ return localStorage.getItem("gemuの前の本") || ""; }catch{ return ""; } };
-const 本の見出し = b => `${b.著}${b.状態 === "仮登録" ? "（仮登録）" : ""}`;
+const 本の見出し = b => [b.著, b.版元].filter(Boolean).join("／") + (b.状態 === "仮登録" ? "（仮登録）" : "");
 
 async function 題の窓(やること){
   const w = 本窓 = { やること, 出す:true, 本ら:null, 選んだ:null, 探す:"", 申請:false, 送信中:false };
@@ -515,7 +515,7 @@ function 本の候補(){
   const w = 本窓;
   if(w.本ら === null) return 待ちの画面("本棚を読んでいます");
   const 語 = w.探す.trim().toLowerCase();
-  const 候補 = w.本ら.filter(b=>!語 || (b.題 + " " + b.著).toLowerCase().includes(語))
+  const 候補 = w.本ら.filter(b=>!語 || (b.題 + " " + (b.副題 || "") + " " + b.著).toLowerCase().includes(語))
     .sort((a, b)=>a.題.localeCompare(b.題, "ja")).slice(0, 50);
   if(!候補.length) return `<p class="注">見つかりません。</p>`;
   return 候補.map(b=>`<button class="本の候補の札 ${w.選んだ?.id === b.id ? "いま" : ""}" data-する="本を選ぶ" data-本="${逃(b.id)}">
@@ -564,6 +564,7 @@ async function 本で決める(el){
   if(!w) return;
   if(w.出す && !w.選んだ) return 知らせる("本を選んでください", true);
   const 題 = w.出す ? w.選んだ.題 : "", 本 = w.出す ? w.選んだ.id : "";
+  状態.いまの本 = w.出す ? w.選んだ : null;   // 読了のときに総ページ数をはじめから入れるため
   try{ if(本) localStorage.setItem("gemuの前の本", 本); }catch{}
   if(el) el.disabled = true;
   try{
@@ -886,7 +887,8 @@ function 読み終える窓(){
     ${題 ? `<label class="読了の印"><input type="checkbox" id="読了の印"> この本を最後まで読んだ（読了）</label>` : ""}
     <div id="総ページの欄" hidden>
       <label class="名札" for="総ページ">この本の総ページ数（わかれば）</label>
-      <input id="総ページ" class="欄" type="number" inputmode="numeric" min="0" max="20000" placeholder="例：320">
+      <input id="総ページ" class="欄" type="number" inputmode="numeric" min="0" max="20000" placeholder="例：320"
+        value="${状態.いまの本?.id === 本 && 状態.いまの本.ページ ? 状態.いまの本.ページ : ""}">
     </div>
     <div class="共有の見本" id="共有の見本">${待ちの画面("絵を描いています")}</div>
     <p class="窓の文">X に投稿しますか？</p>

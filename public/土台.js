@@ -249,12 +249,24 @@ function 本に(d){
   return { id:d.id, 題:x.title || "", 著:x.author || "", 版元:x.publisher || "", isbn:x.isbn || "",
     ひとこと:x.note || "", 状態:状態の名[x.status] || x.status, 申請者:x.requestedBy || "" };
 }
+
+/* Hongaeshi から写した本棚（public/本棚.json。04_tools/Hongaeshiから写す.mjs で作る）。
+   **本登録の本**として一覧に混ぜる（2026-09-29 配信者「Hongaeshi の図書データをコピーして」）。
+   ⚠️ Firestore には入っていない（こちらの管理用の鍵が無いため）。id は "h-…" */
+let 本棚の約束 = null;
+export function 本棚を読む(){
+  本棚の約束 ||= fetch("/本棚.json").then(r=>r.ok ? r.json() : { 本:[] })
+    .then(j=>(j.本 || []).map(b=>({ ...b, ひとこと:"", 状態:"本登録", 申請者:"" })))
+    .catch(()=>[]);
+  return 本棚の約束;
+}
 export async function 本らを読む(){
-  const [本登録, 自分の] = await Promise.all([
+  const [本登録, 自分の, 棚] = await Promise.all([
     getDocs(query(collection(db, "books"), where("status", "==", "approved"))),
     getDocs(query(collection(db, "books"), where("requestedBy", "==", 私.uid))),
+    本棚を読む(),
   ]);
-  const 表 = new Map();
+  const 表 = new Map(棚.map(b=>[b.id, b]));
   for(const d of [...本登録.docs, ...自分の.docs]) 表.set(d.id, 本に(d));
   return [...表.values()].filter(b=>b.状態 !== "見送り");
 }
