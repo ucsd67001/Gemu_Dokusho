@@ -182,6 +182,7 @@ export async function 立つ({ 記録する = false } = {}){
 }
 export const 座っている = () => いま ? { ...いま } : null;
 
+export async function 古い記録を消す(){ return 0; }
 export async function 記録を読む(){
   return 読む().記録.filter(x=>x.uid === 私.uid)
     .sort((a, b)=>b.始め - a.始め)

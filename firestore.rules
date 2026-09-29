@@ -76,6 +76,12 @@ service cloud.firestore {
         && request.resource.data.from <= request.resource.data.to
         && request.resource.data.to <= request.time + duration.value(5, 'm')
         && request.resource.data.from >= request.time - duration.value(2, 'd');
+      /* ⚠️ 今回だけ（2026-09-29 配信者「今日より前の記録は全部消して」）。
+         「読み終えたときだけ記録する」決まりの前の記録には、閉じただけの回が混ざっているため。
+         **本人の記録で、2026-09-29 0時（日本時間）＝1790607600000 より前のものだけ**、本人が消せる。
+         画面（土台.js の 古い記録を消す）が、ログインしたときに一度だけ消す。二人とも消し終えたら、この行と画面の処理を外す */
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid
+        && resource.data.from < timestamp.value(1790607600000);
     }
 
     /* X に投稿した読書の記録。記録ページ（functions の sharePage）が読む。
