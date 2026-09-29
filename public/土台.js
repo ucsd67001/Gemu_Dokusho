@@ -22,7 +22,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
   from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, collection,
-  query, where, orderBy, limit, onSnapshot, runTransaction, serverTimestamp
+  query, where, orderBy, limit, onSnapshot, runTransaction, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { getStorage, ref as 置き場, getDownloadURL, uploadBytes }
   from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
@@ -150,7 +150,11 @@ export function 席を見張る(部屋, 届いたら){
     e=>console.error(e));
 }
 
-let いま = null;   // { 部屋, 番, 記録, 入った }
+/* ⚠️⚠️ 読んだ時間の記録は、**「読み終える」で終えたときだけ**書く（2026-09-29 配信者）。
+      座っているあいだは書かない。本を替えた区切り（題と始めの時刻）は、ここで覚えておくだけ。
+      ほかの頁へ移る・タブを閉じる・ログアウトは、席を立つだけで記録しない。
+      （前は座った瞬間に記録を作り、1分ごとに延ばしていた。閉じただけの回も残っていた） */
+let いま = null;   // { 部屋, 番, 入った, 区切り:[{ 題, 始め }] }
 
 export async function 座る(部屋, 題, 席の数){
   await 立つ();
@@ -170,39 +174,39 @@ export async function 座る(部屋, 題, 席の数){
         tx.set(r, { uid:私.uid, title:題, since:serverTimestamp(), seen:serverTimestamp() });
       });
     }catch(e){ continue; }
-    const 記録 = await 記録を始める(部屋, 題);
-    いま = { 部屋, 番, 記録, 入った:Date.now() };
+    const 今 = Date.now();
+    いま = { 部屋, 番, 入った:今, 区切り:[{ 題, 始め:今 }] };
     return 番;
   }
   throw new Error("満席です");
 }
 
-async function 記録を始める(部屋, 題){
-  const r = await addDoc(collection(db, "logs"),
-    { uid:私.uid, room:部屋, title:題, from:serverTimestamp(), to:serverTimestamp() });
-  return r.id;
-}
-
 export async function 題を替える(題){
   if(!いま) return;
-  await updateDoc(doc(db, "logs", いま.記録), { to:serverTimestamp() }).catch(()=>{});
   await updateDoc(doc(db, "rooms", いま.部屋, "seats", String(いま.番)), { title:題, seen:serverTimestamp() });
-  いま.記録 = await 記録を始める(いま.部屋, 題);
+  いま.区切り.push({ 題, 始め:Date.now() });
 }
 
 export async function 生きている(){
   if(!いま) return;
-  await Promise.all([
-    updateDoc(doc(db, "rooms", いま.部屋, "seats", String(いま.番)), { seen:serverTimestamp() }),
-    updateDoc(doc(db, "logs", いま.記録), { to:serverTimestamp() }),
-  ]);
+  await updateDoc(doc(db, "rooms", いま.部屋, "seats", String(いま.番)), { seen:serverTimestamp() });
 }
 
-export async function 立つ(){
+/* 席を立つ。記録する＝true は「読み終える」のときだけ。本を替えた区切りごとに1件ずつ書く */
+export async function 立つ({ 記録する = false } = {}){
   if(!いま) return;
   const 席 = いま; いま = null;
+  const 書く = [];
+  if(記録する){
+    const 終わり = Date.now();
+    席.区切り.forEach((k, i)=>{
+      const 次 = 席.区切り[i + 1]?.始め ?? 終わり;
+      書く.push(addDoc(collection(db, "logs"), { uid:私.uid, room:席.部屋, title:k.題,
+        from:Timestamp.fromMillis(k.始め), to:Timestamp.fromMillis(次) }));
+    });
+  }
   await Promise.all([
-    updateDoc(doc(db, "logs", 席.記録), { to:serverTimestamp() }).catch(()=>{}),
+    ...書く,
     deleteDoc(doc(db, "rooms", 席.部屋, "seats", String(席.番))).catch(()=>{}),
   ]);
 }

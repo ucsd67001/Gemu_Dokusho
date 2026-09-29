@@ -464,7 +464,7 @@ async function 記録の頁(){
   <section class="幕">
     <p class="英字の札">Reading log</p>
     <h1 class="中見出し">読んだ時間</h1>
-    <p class="導き">ベンチに座っていた時間です。</p>
+    <p class="導き">ベンチに座っていた時間です。「読み終える」で終えた回だけが残ります。</p>
     <div id="記録の中">${待ちの画面("読みこんでいます")}</div>
   </section>`;
   let 記録;
@@ -630,6 +630,8 @@ const 動き = {
     }
   },
   読み終える: ()=>読み終える窓(),
+  // ⚠️ 2026-09-27 に行の範囲で消したとき、これまで消えていた（「投稿しないで終える」が効かなかった）
+  そのまま終える: ()=>終える(),
   投稿して終える: async el=>{
     el.disabled = true;
     el.textContent = "投稿の準備をしています…";
@@ -643,7 +645,7 @@ const 動き = {
     try{ if(読み終えの絵) 行き先 = await 土台.共有を作る(読み終えの絵, { 題, 分, 場所 }); }
     catch(e){ console.error(e); }
     const 先 = "https://x.com/intent/post?text=" + encodeURIComponent(文) + "&url=" + encodeURIComponent(行き先);
-    await 土台.立つ().catch(()=>{});
+    await 土台.立つ({ 記録する:true }).catch(()=>{});
     /* スマホ：このページのまま X へ移る（X のアプリが入っていれば、アプリが開く）。
        ⚠️ 絵を置き終わってから新しい窓を開くと、スマホでは止められて、X が立ち上がらなかった（2026-09-27 配信者） */
     if(スマホ){ location.href = 先; return; }
@@ -696,9 +698,10 @@ function 読み終える窓(){
   });
 }
 
+// 「読み終える」で終えたときだけ、読んだ時間を記録に残す（2026-09-29 配信者）
 async function 終える(){
   窓を閉じる();
-  await 土台.立つ().catch(()=>{});
+  await 土台.立つ({ 記録する:true }).catch(()=>{});
   行く("廊下");
   知らせる("おつかれさまでした");
 }

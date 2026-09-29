@@ -11,7 +11,7 @@ rules_version = '2';
 
         users/{uid}          { name, created, flip, avatar{ status, step, sit, turn, face, facing, error, at, day, count } }
         rooms/{room}/seats/{席番号}  { uid, title, since, seen }
-        logs/{id}            { uid, room, title, from, to }
+        logs/{id}            { uid, room, title, from, to }   ← 「読み終える」で終えたときだけ書く
         meta/usage           { day, count }   ← functions だけが書く（アバターを作った回数・全員ぶん）
         shares/{id}          { uid, title, minutes, place, image, created }  ← 読み終えて X に投稿したときの記録。だれでも読める
 
@@ -61,20 +61,21 @@ service cloud.firestore {
       allow delete: if signedIn() && (resource.data.uid == request.auth.uid || stale());
     }
 
-    /* 読んだ時間の記録。入室で作り、1分ごとに to を延ばす。
-       ⚠️ 立つときに書くだけだと、タブを閉じた回が記録に残らない。 */
+    /* 読んだ時間の記録。**「読み終える」で終えたときだけ**、画面が区切りごとに1件ずつ書く（2026-09-29 配信者）。
+       from/to は画面の時計（本を替えた区切りの時刻）。あとから直さない（update は無い）。
+       ⚠️ 読めるのは本人だけ（前は、ログインした人ならだれの記録でも読めた） */
     match /logs/{id} {
-      allow read: if signedIn();
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['uid', 'room', 'title', 'from', 'to'])
         && request.resource.data.uid == request.auth.uid
         && validTitle(request.resource.data.title)
         && request.resource.data.room is string
-        && request.resource.data.from == request.time
-        && request.resource.data.to == request.time;
-      allow update: if signedIn() && resource.data.uid == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['to'])
-        && request.resource.data.to == request.time;
+        && request.resource.data.from is timestamp
+        && request.resource.data.to is timestamp
+        && request.resource.data.from <= request.resource.data.to
+        && request.resource.data.to <= request.time + duration.value(5, 'm')
+        && request.resource.data.from >= request.time - duration.value(2, 'd');
     }
 
     /* X に投稿した読書の記録。記録ページ（functions の sharePage）が読む。

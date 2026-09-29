@@ -135,7 +135,7 @@ export function 席を見張る(部屋, 届いたら){
   });
 }
 
-let いま = null;
+let いま = null;   // { 部屋, 番, 入った, 区切り }。記録は「読み終える」のときだけ（土台.js と同じ）
 export async function 座る(部屋, 題, 席の数){
   await 立つ();
   const s = 読む();
@@ -145,29 +145,18 @@ export async function 座る(部屋, 題, 席の数){
     const x = 席ら[番];
     if(x && x.uid !== 私.uid && 生きた席(x)) continue;
     席ら[番] = { uid:私.uid, 題, 入った:Date.now(), 見た:Date.now() };
-    const 記録 = 記録を始める(s, 部屋, 題);
     書く(s);
-    いま = { 部屋, 番, 記録, 入った:Date.now() };
+    いま = { 部屋, 番, 入った:Date.now(), 区切り:[{ 題, 始め:Date.now() }] };
     return 番;
   }
   throw new Error("満席です");
 }
-function 記録を始める(s, 部屋, 題){
-  const id = Math.random().toString(36).slice(2);
-  s.記録.push({ id, uid:私.uid, 部屋, 題, 始め:Date.now(), 終わり:Date.now() });
-  return id;
-}
-function 記録を延ばす(s, id){
-  const r = s.記録.find(x=>x.id === id);
-  if(r) r.終わり = Date.now();
-}
 export async function 題を替える(題){
   if(!いま) return;
   const s = 読む();
-  記録を延ばす(s, いま.記録);
   const 席 = s.席[いま.部屋]?.[いま.番];
   if(席){ 席.題 = 題; 席.見た = Date.now(); }
-  いま.記録 = 記録を始める(s, いま.部屋, 題);
+  いま.区切り.push({ 題, 始め:Date.now() });
   書く(s);
 }
 export async function 生きている(){
@@ -175,13 +164,18 @@ export async function 生きている(){
   const s = 読む();
   const 席 = s.席[いま.部屋]?.[いま.番];
   if(席) 席.見た = Date.now();
-  記録を延ばす(s, いま.記録);
   書く(s);
 }
-export async function 立つ(){
+export async function 立つ({ 記録する = false } = {}){
   if(!いま) return;
   const s = 読む();
-  記録を延ばす(s, いま.記録);
+  if(記録する){
+    const 終わり = Date.now();
+    いま.区切り.forEach((k, i)=>{
+      s.記録.push({ id:Math.random().toString(36).slice(2), uid:私.uid, 部屋:いま.部屋, 題:k.題,
+        始め:k.始め, 終わり:いま.区切り[i + 1]?.始め ?? 終わり });
+    });
+  }
   if(s.席[いま.部屋]?.[いま.番]?.uid === 私?.uid) delete s.席[いま.部屋][いま.番];
   いま = null;
   書く(s);
