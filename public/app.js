@@ -134,12 +134,13 @@ function 描く(){
 function 帯を描く(){
   const 入った = 状態.私 && 状態.自分?.アバター?.座る;
   document.getElementById("nav").innerHTML = 入った ? [
-    ["廊下", "場所"], ["記録", "記録"], ["自分", "自分"],
+    // 「自分」は外した。右の顔と名前のボタンが自分のページへの入口（2026-09-29 配信者）
+    ["廊下", "場所"], ["記録", "記録"],
   ].map(([頁, 字])=>`<button class="${状態.頁 === 頁 || (頁 === "廊下" && 状態.頁 === "部屋") ? "いま" : ""}"
       data-する="行く" data-頁="${頁}">${字}</button>`).join("") : "";
   const 右 = document.getElementById("帯の右");
   // 顔と名前を1つのボタンに（Hongaeshi の「わたし」と同じ形。2026-09-27 配信者）
-  if(入った) 右.innerHTML = `<button class="わたし" data-する="行く" data-頁="自分" title="自分">
+  if(入った) 右.innerHTML = `<button class="わたし ${状態.頁 === "自分" ? "いま" : ""}" data-する="行く" data-頁="自分" title="自分のページ">
       ${顔の絵(状態.自分)}<span class="名">${逃(状態.自分.名)}</span></button>`;
   else if(状態.起きた && !状態.私) 右.innerHTML = `<button class="釦 小" data-する="入る">${試しか ? "試しに入る" : "Google で入る"}</button>`;
   else 右.innerHTML = "";
