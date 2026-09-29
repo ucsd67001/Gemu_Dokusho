@@ -154,7 +154,7 @@ const 待ちの画面 = 字 => `<div class="待つ"><div class="積み木">${"<i
 function 入口(){
   const 部屋 = 部屋ら[最初の部屋];
   画面.innerHTML = `
-  <div class="看板"><div class="舞台" style="aspect-ratio:${部屋.比}"><img class="背景" src="${部屋の絵(部屋)}" alt="${逃(部屋.名)}"></div></div>
+  <div class="看板"><div class="舞台" style="aspect-ratio:${部屋.比}"><img class="背景" src="${部屋の絵(部屋)}" alt="${逃(部屋.名)}">${人とベンチ(部屋, [])}</div></div>
   <section class="幕">
     <p class="英字の札">GEMu Dokusho</p>
     <h1 class="大見出し">家にいながら、<br>景色のいい場所で読む。</h1>
@@ -250,7 +250,7 @@ function 廊下(){
     <div class="部屋の列">
       ${出す部屋ら().map(([id, 部屋])=>`
       <button class="部屋の札" data-する="場所へ" data-部屋="${id}">
-        <div class="小さな舞台"><div class="舞台" style="border:none;aspect-ratio:${部屋.比}"><img class="背景" src="${部屋の絵(部屋)}" alt=""></div></div>
+        <div class="小さな舞台"><div class="舞台" id="小舞台-${id}" style="border:none;aspect-ratio:${部屋.比}"><img class="背景" src="${部屋の絵(部屋)}" alt="">${人とベンチ(部屋, [])}</div></div>
         <div>
           <div class="部屋の名">${逃(部屋.名)}</div>
           <div class="部屋の素性" id="居る数-${id}">${逃(部屋.添え)}</div>
@@ -272,6 +272,11 @@ function 廊下(){
       if(札){ 札.textContent = 満席 ? "満席" : "入る"; 札.className = 満席 ? "札" : "札 藤"; }
       列.innerHTML = 席ら.map(s=>顔の絵(状態.人々.get(s.uid), "中")).join("");
       絵を入れる(列);
+      const 小舞台 = document.getElementById(`小舞台-${id}`);
+      if(小舞台){
+        小舞台.innerHTML = 小舞台.querySelector("img.背景").outerHTML + 人とベンチ(部屋, 席ら);
+        絵を入れる(小舞台);
+      }
     }));
   }
 }
@@ -338,23 +343,20 @@ const 満席か = () => 状態.席ら.length >= (部屋ら[状態.部屋]?.席.l
 const 元の題名 = document.title;
 addEventListener("visibilitychange", ()=>{ if(!document.hidden) document.title = 元の題名; });
 
-function 部屋を描き直す(){
-  const 舞台 = document.getElementById("舞台");
-  if(!舞台) return;
-  const 部屋 = 部屋ら[状態.部屋];
-  // 奥（y が小さい）から描いて、手前の人が上に重なるようにする
-  const 並び = [...状態.席ら].sort((a, b)=>(部屋.席[a.番]?.y || 0) - (部屋.席[b.番]?.y || 0));
-  const 背景 = 舞台.querySelector("img.背景").outerHTML;
-  const 置き = (席, 幅) => `left:${席.x}%;top:${席.y}%${幅 ? `;width:${席.幅}%` : ""}`;
+const 置き = (席, 幅) => `left:${席.x}%;top:${席.y}%${幅 ? `;width:${席.幅}%` : ""}`;
+
+/* 場所の絵の上に置く、空のベンチと座っている人（名札は無し）。
+   場所の中の舞台と、一覧の小さな絵・入口の看板で同じものを使う（2026-09-29 配信者：サムネイルにもベンチを） */
+function 人とベンチ(部屋, 席ら){
+  const 座られた = new Set(席ら.map(s=>s.番));
   // 誰も座っていない席には、空のベンチを置く（場所に 空き の絵があるときだけ）。絵の向きは 空きの向き
-  const 座られた = new Set(状態.席ら.map(s=>s.番));
-  const 空きら = 部屋.空き ? 部屋.席.map((席, 番)=>({ 席, 番 })).filter(x=>!座られた.has(x.番)) : [];
-  const 空きの絵 = 空きら.map(({ 席 })=>`
+  const 空きの絵 = 部屋.空き ? 部屋.席.map((席, 番)=>座られた.has(番) ? "" : `
     <div class="人 空き ${空きを反転するか(部屋, 席) ? "左向き" : ""}" style="${置き(席, true)}">
       <div class="姿"><img class="座る" src="${部屋.空き[席.姿] || 部屋.空き.顔}" alt=""></div>
-    </div>`).join("");
-  // ⚠️ 名札は人の絵と別の層にして、最後に重ねる。人の中に入れると、手前の人が奥の人の名札を隠す
-  舞台.innerHTML = 背景 + 空きの絵 + 並び.map(s=>{
+    </div>`).join("") : "";
+  // 奥（y が小さい）から描いて、手前の人が上に重なるようにする
+  const 並び = [...席ら].sort((a, b)=>(部屋.席[a.番]?.y || 0) - (部屋.席[b.番]?.y || 0));
+  return 空きの絵 + 並び.map(s=>{
     const 席 = 部屋.席[s.番];
     if(!席) return "";
     const 人 = 状態.人々.get(s.uid), a = 人?.アバター || {};
@@ -367,7 +369,19 @@ function 部屋を描き直す(){
         <img class="めくる" data-道="${逃(背中 ? a.背中 : a.めくる)}" alt="">
       </div>
     </div>`;
-  }).join("") + 並び.map(s=>{
+  }).join("");
+}
+
+function 部屋を描き直す(){
+  const 舞台 = document.getElementById("舞台");
+  if(!舞台) return;
+  const 部屋 = 部屋ら[状態.部屋];
+  // 奥（y が小さい）から描いて、手前の人が上に重なるようにする
+  const 並び = [...状態.席ら].sort((a, b)=>(部屋.席[a.番]?.y || 0) - (部屋.席[b.番]?.y || 0));
+  const 背景 = 舞台.querySelector("img.背景").outerHTML;
+  const 座られた = new Set(状態.席ら.map(s=>s.番));
+  // ⚠️ 名札は人の絵と別の層にして、最後に重ねる。人の中に入れると、手前の人が奥の人の名札を隠す
+  舞台.innerHTML = 背景 + 人とベンチ(部屋, 状態.席ら) + 並び.map(s=>{
     const 席 = 部屋.席[s.番];
     if(!席) return "";
     // 同じベンチに2人いるときは、2人目の名札を1段下げる（横に振り分けると、隣のブロックの名札とぶつかった）
