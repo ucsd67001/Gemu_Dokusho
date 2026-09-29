@@ -182,6 +182,9 @@ h2.節見出し{font-size:17px;font-weight:600;letter-spacing:.09em;margin:0}
 .部屋の名{font-size:19px;font-weight:600;letter-spacing:.08em;line-height:1.5}
 .部屋の素性{font-family:var(--ゴシック);font-size:12px;color:var(--字の薄い);margin-top:6px}
 .顔の列{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+/* 行全体が押せる。右の札は「押すと何が起きるか」を言うボタンの形。行に乗せたら濃くする */
+.部屋の札 .入口の釦{white-space:nowrap}
+.部屋の札:hover .入口の釦{color:var(--字);box-shadow:inset 0 0 0 1px var(--字)}
 
 /* ── 部屋（舞台） ───────────────────────────
    座標は部屋.js の席（絵の上の %）。人の足もとを席の点に合わせる */

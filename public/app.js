@@ -256,7 +256,7 @@ function 廊下(){
           <div class="部屋の素性" id="居る数-${id}">${逃(部屋.添え)}</div>
           <div class="顔の列" id="顔の列-${id}"></div>
         </div>
-        <span class="札 藤" id="札-${id}">入る</span>
+        <span class="釦 小 枠だけ 入口の釦" id="札-${id}">ここで読む →</span>
       </button>`).join("")}
     </div>
   </section>`;
@@ -269,7 +269,8 @@ function 廊下(){
       数.textContent = 満席 ? `いまは満席です（${部屋.席.length}人）。のぞいて、ベンチが空くのを待つことはできます`
         : 席ら.length ? `いま${席ら.length}人が読んでいます（${部屋.席.length}席）` : `いまは誰もいません（${部屋.席.length}席）`;
       const 札 = document.getElementById(`札-${id}`);
-      if(札){ 札.textContent = 満席 ? "満席" : "入る"; 札.className = 満席 ? "札" : "札 藤"; }
+      // ⚠️ 前は「入る」という札で、何のためのものか分かりにくかった（配信者）。行全体が押せる。札は「何が起きるか」を言う
+      if(札) 札.textContent = 満席 ? "のぞく →" : "ここで読む →";
       列.innerHTML = 席ら.map(s=>顔の絵(状態.人々.get(s.uid), "中")).join("");
       絵を入れる(列);
       const 小舞台 = document.getElementById(`小舞台-${id}`);
