@@ -196,7 +196,7 @@ export async function 古い記録を消す(){ return 0; }
 export const 題を出さない印 = "（題を出さずに読んだ本）";
 // 本（土台.js と同じ形）。試しの人は管理者でもある（管理の頁を試すため）
 const 本ら = s => Object.entries(s.本 ||= {}).map(([id, x])=>({ id, 題:x.題, 著:x.著, 版元:x.版元 || "",
-  isbn:x.isbn || "", ひとこと:x.ひとこと || "", 状態:x.状態, 申請者:x.申請者 || "" }));
+  isbn:x.isbn || "", ひとこと:x.ひとこと || "", ページ:x.ページ || 0, 状態:x.状態, 申請者:x.申請者 || "" }));
 
 /* Hongaeshi から写した本棚（public/本棚.json。04_tools/Hongaeshiから写す.mjs で作る）。
    **本登録の本**として一覧に混ぜる（2026-09-29 配信者「Hongaeshi の図書データをコピーして」）。
@@ -212,12 +212,12 @@ export async function 本らを読む(){
   const 棚 = await 本棚を読む();
   return [...棚, ...本ら(読む()).filter(b=>b.状態 === "本登録" || (b.状態 === "仮登録" && b.申請者 === 私.uid))];
 }
-export async function 本を申請する({ 題, 著, 版元, isbn, ひとこと }){
+export async function 本を申請する({ 題, 著, 版元, isbn, ひとこと, ページ = 0 }){
   const s = 読む();
   const id = "b" + Math.random().toString(36).slice(2, 8);
-  (s.本 ||= {})[id] = { 題, 著, 版元, isbn, ひとこと, 状態:"仮登録", 申請者:私.uid };
+  (s.本 ||= {})[id] = { 題, 著, 版元, isbn, ひとこと, ページ, 状態:"仮登録", 申請者:私.uid };
   書く(s);
-  return { id, 題, 著, 版元, isbn, ひとこと, 状態:"仮登録", 申請者:私.uid };
+  return { id, 題, 著, 版元, isbn, ひとこと, ページ, 状態:"仮登録", 申請者:私.uid };
 }
 export async function 管理者か(){ return true; }
 export async function 申請らを読む(){ return 本ら(読む()).filter(b=>b.状態 === "仮登録"); }

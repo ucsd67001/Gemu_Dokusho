@@ -13,6 +13,7 @@
    ============================================================ */
 
 import { 部屋ら, 部屋の絵, 出す部屋ら, 最初の部屋 } from "./部屋.js";
+import { AmazonのASIN, ISBN13にする, ISBNで確かめる } from "./書誌.js";
 
 const 試しか = location.pathname === "/demo" || location.pathname.startsWith("/demo/");
 const 土台 = await import(試しか ? "./試し/土台.js" : "./土台.js");
@@ -529,14 +530,25 @@ function 本の窓を描く(){
   if(w.申請) return 窓を出す("本の登録を申請する", `
     <p class="窓の文" style="font-size:14px">一覧に無い本を教えてください。管理者が確かめてから<b>本登録</b>にします。
       それまでは<b>仮登録</b>ですが、申請したあなたは、この題ですぐに${座る ? "座れます" : "替えられます"}。</p>
+    ${/* Amazon のリンク・ISBN から書誌を引く（Hongaeshi の申請の窓と同じ。2026-09-30 配信者） */ ""}
+    <label class="名札" for="申amazon">Amazon の URL（任意・ここから書誌を引けます）</label>
+    <div class="欄と釦">
+      <input id="申amazon" class="欄" placeholder="https://www.amazon.co.jp/…/dp/4166612476">
+      <button class="釦 枠だけ 小" data-する="Amazonから読む">読み取る</button>
+    </div>
+    <p class="注">紙の本の URL なら、書名・著者名・出版社名を自動で入れます。短縮リンク（amzn.to/… など）は、一度開いて出てきた URL を貼ってください。<b>リンク自体は保存しません。</b></p>
+    <label class="名札" for="申isbn">ISBN（わかれば。あると確実です）</label>
+    <div class="欄と釦">
+      <input id="申isbn" class="欄" maxlength="20" inputmode="numeric" placeholder="9784166612475">
+      <button class="釦 枠だけ 小" data-する="ISBNを確かめる">確かめる</button>
+    </div>
+    <div id="申請の確認"></div>
     <label class="名札" for="申題">書名（必須）</label>
     <input id="申題" class="欄" maxlength="120" value="${逃(w.探す)}">
     <label class="名札" for="申著">著者名（必須）</label>
     <input id="申著" class="欄" maxlength="80">
     <label class="名札" for="申版元">出版社名（必須）</label>
     <input id="申版元" class="欄" maxlength="80">
-    <label class="名札" for="申isbn">ISBN（わかれば）</label>
-    <input id="申isbn" class="欄" maxlength="20" inputmode="numeric" placeholder="9784…">
     <label class="名札" for="申ひとこと">ひとこと（任意）</label>
     <input id="申ひとこと" class="欄" maxlength="300" placeholder="例）文庫版です">
     <p class="注">書名だけでは別の本と取り違えるので、著者名と出版社名もお願いしています。</p>
@@ -557,6 +569,27 @@ function 本の窓を描く(){
     <div class="釦たち" style="margin-top:20px">
       <button class="釦 全幅" data-する="題を決める" ${w.出す && !w.選んだ ? "disabled" : ""}>${座る ? "ベンチに座る" : "替える"}</button>
     </div>`);
+}
+
+/* ISBN から書誌を引いて、申請の欄に入れる。
+   ⚠️ 窓ごと描き直さない（打ちかけの欄が消える）。欄の値だけを入れ替え、結果は #申請の確認 に出す。
+   ⚠️ 確かめた ISBN の本が、もう本棚にあれば知らせて、その本を選べるようにする（Hongaeshi と同じ。二重の申請を減らす） */
+async function 書誌を入れる(isbn){
+  const 確認 = document.getElementById("申請の確認");
+  const 出す = html =>{ if(確認) 確認.innerHTML = html; };
+  出す(`<p class="注">さがしています…</p>`);
+  const 十三 = ISBN13にする(isbn);
+  const 棚の本 = 十三 && 本窓?.本ら?.find(b=>ISBN13にする(b.isbn) === 十三);
+  if(棚の本) return 出す(`<div class="申請の知らせ"><b>この本は、もう本棚にあります。</b><br>
+    『${逃(棚の本.題)}』 ${逃(本の見出し(棚の本))}
+    <div class="釦たち" style="margin-top:8px"><button class="釦 枠だけ 小" data-する="棚の本を選ぶ" data-本="${逃(棚の本.id)}">この本を選ぶ</button></div></div>`);
+  const r = await ISBNで確かめる(isbn);
+  if(!r) return 出す(`<p class="注" style="color:var(--誤り)">その ISBN の書誌は見つかりませんでした。下に手で書いてください。</p>`);
+  const 入れる = (id, v)=>{ const e = document.getElementById(id); if(e && v) e.value = v; };
+  入れる("申題", r.題); 入れる("申著", r.著); 入れる("申版元", r.版元); 入れる("申isbn", r.isbn);
+  if(本窓) 本窓.申請のページ = r.ページ || 0;
+  出す(`<div class="申請の知らせ">見つかりました。書名・著者名・出版社名を入れました。<br>
+    <b>『${逃(r.題)}』</b> ${逃(r.著)}／${逃(r.版元)}${r.年 ? `・${逃(r.年)}` : ""}${r.ページ ? `・${r.ページ}ページ` : ""}</div>`);
 }
 
 async function 本で決める(el){
@@ -675,11 +708,25 @@ async function 管理の頁(){
       <label class="名札">書名</label><input class="欄" id="管題-${逃(b.id)}" maxlength="120" value="${逃(b.題)}">
       <label class="名札">著者名</label><input class="欄" id="管著-${逃(b.id)}" maxlength="80" value="${逃(b.著)}">
       <label class="名札">出版社名</label><input class="欄" id="管版元-${逃(b.id)}" maxlength="80" value="${逃(b.版元)}">
+      ${b.isbn ? `<div class="釦たち" style="margin-top:10px">
+        <button class="釦 枠だけ 小" data-する="書誌を引き直す" data-本="${逃(b.id)}" data-isbn="${逃(b.isbn)}">ISBN から書誌を引き直す</button></div>
+        <div id="管確認-${逃(b.id)}"></div>` : ""}
       <div class="釦たち" style="margin-top:14px">
         <button class="釦 小" data-する="申請を承認" data-本="${逃(b.id)}">本登録にする</button>
         <button class="釦 小 枠だけ" data-する="申請を見送る" data-本="${逃(b.id)}">見送る</button>
       </div>
     </div>`).join("")}</div>`;
+}
+
+/* 管理：申請の ISBN で openBD を引き直し、書名・著者・出版社を正しい表記に入れ替える（Hongaeshi の申請の処理と同じく、承認の前に書誌を確かめる） */
+async function 書誌を引き直す(el){
+  const id = el.dataset.本, 確認 = document.getElementById(`管確認-${id}`);
+  if(確認) 確認.innerHTML = `<p class="注">さがしています…</p>`;
+  const r = await ISBNで確かめる(el.dataset.isbn);
+  if(!r){ if(確認) 確認.innerHTML = `<p class="注" style="color:var(--誤り)">書誌は見つかりませんでした。</p>`; return; }
+  const 入れる = (k, v)=>{ const e = document.getElementById(`${k}-${id}`); if(e && v) e.value = v; };
+  入れる("管題", r.題); 入れる("管著", r.著); 入れる("管版元", r.版元);
+  if(確認) 確認.innerHTML = `<p class="注">openBD の書誌を入れました：『${逃(r.題)}』 ${逃(r.著)}／${逃(r.版元)}${r.ページ ? `・${r.ページ}ページ` : ""}</p>`;
 }
 
 async function 申請を決める(el, 承認){
@@ -812,7 +859,8 @@ const 動き = {
   申請をとじる: ()=>{ 本窓.申請 = false; 本の窓を描く(); },
   申請して決める: async ()=>{
     const 値 = id => document.getElementById(id)?.value.trim() || "";
-    const 申 = { 題:値("申題"), 著:値("申著"), 版元:値("申版元"), isbn:値("申isbn").replace(/[^0-9Xx]/g, ""), ひとこと:値("申ひとこと") };
+    const 申 = { 題:値("申題"), 著:値("申著"), 版元:値("申版元"), isbn:値("申isbn").replace(/[^0-9Xx]/g, ""), ひとこと:値("申ひとこと"),
+      ページ:本窓.申請のページ || 0 };
     if(!申.題 || !申.著 || !申.版元) return 知らせる("書名・著者名・出版社名を入れてください", true);
     本窓.送信中 = true;
     本の窓を描く();
@@ -832,6 +880,28 @@ const 動き = {
       知らせる("申請できませんでした", true);
     }
   },
+  Amazonから読む: async ()=>{
+    const u = document.getElementById("申amazon")?.value.trim() || "";
+    if(/link\.amazon|amzn\.to|amzn\.asia/.test(u)) return 知らせる("短縮リンクは辿れません。一度開いて、出てきた URL を貼ってください", true);
+    const asin = AmazonのASIN(u);
+    if(!asin) return 知らせる("Amazon の URL から商品番号を読み取れませんでした", true);
+    const isbn = ISBN13にする(asin);
+    if(!isbn) return 知らせる("Kindle 版などは書誌を引けません。紙の本の URL でお願いします", true);
+    document.getElementById("申isbn").value = isbn;
+    await 書誌を入れる(isbn);
+  },
+  ISBNを確かめる: async ()=>{
+    const v = document.getElementById("申isbn")?.value || "";
+    if(v.replace(/[^0-9Xx]/g, "").length < 10) return 知らせる("ISBN を10桁以上入れてください", true);
+    await 書誌を入れる(v);
+  },
+  棚の本を選ぶ: el=>{
+    本窓.選んだ = 本窓.本ら.find(b=>b.id === el.dataset.本) || null;
+    本窓.出す = true;
+    本窓.申請 = false;
+    本の窓を描く();
+  },
+  書誌を引き直す: el=>書誌を引き直す(el),
   申請を承認: el=>申請を決める(el, true),
   申請を見送る: el=>申請を決める(el, false),
   読み終える: ()=>読み終える窓(),

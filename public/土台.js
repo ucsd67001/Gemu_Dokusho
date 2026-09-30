@@ -247,7 +247,7 @@ const 状態の名 = { pending:"仮登録", approved:"本登録", rejected:"見�
 function 本に(d){
   const x = d.data() || {};
   return { id:d.id, 題:x.title || "", 著:x.author || "", 版元:x.publisher || "", isbn:x.isbn || "",
-    ひとこと:x.note || "", 状態:状態の名[x.status] || x.status, 申請者:x.requestedBy || "" };
+    ひとこと:x.note || "", ページ:x.pages || 0, 状態:状態の名[x.status] || x.status, 申請者:x.requestedBy || "" };
 }
 
 /* Hongaeshi から写した本棚（public/本棚.json。04_tools/Hongaeshiから写す.mjs で作る）。
@@ -270,10 +270,10 @@ export async function 本らを読む(){
   for(const d of [...本登録.docs, ...自分の.docs]) 表.set(d.id, 本に(d));
   return [...表.values()].filter(b=>b.状態 !== "見送り");
 }
-export async function 本を申請する({ 題, 著, 版元, isbn, ひとこと }){
+export async function 本を申請する({ 題, 著, 版元, isbn, ひとこと, ページ = 0 }){
   const r = await addDoc(collection(db, "books"), { title:題, author:著, publisher:版元, isbn:isbn || "",
-    note:ひとこと || "", status:"pending", requestedBy:私.uid, created:serverTimestamp() });
-  return { id:r.id, 題, 著, 版元, isbn, ひとこと, 状態:"仮登録", 申請者:私.uid };
+    note:ひとこと || "", pages:ページ || 0, status:"pending", requestedBy:私.uid, created:serverTimestamp() });
+  return { id:r.id, 題, 著, 版元, isbn, ひとこと, ページ, 状態:"仮登録", 申請者:私.uid };
 }
 export async function 管理者か(){
   try{ return (await getDoc(doc(db, "admins", 私.uid))).exists(); }catch{ return false; }
