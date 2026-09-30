@@ -563,9 +563,13 @@ function 本の窓を描く(){
     </div>
     ${w.出す ? `
       <label class="名札" for="本をさがす">本をさがす</label>
-      <input id="本をさがす" class="欄" placeholder="書名か著者名（Amazon の URL も貼れます）" value="${逃(w.探す)}" autocomplete="off">
+      <input id="本をさがす" class="欄" placeholder="書名か著者名" value="${逃(w.探す)}" autocomplete="off">
       <div class="本の候補" id="本の候補">${本の候補()}</div>
-      <p class="注">一覧に無いときは、<a data-する="申請をひらく">本の登録を申請する</a>（Amazon の URL から書誌を自動で入れられます）</p>` : ""}
+      <div class="申請への入口">
+        <span>一覧に無いときは</span>
+        <button class="釦 枠だけ 小" data-する="申請をひらく">＋ 本の登録を申請する</button>
+      </div>
+      <p class="注" style="margin-top:4px">Amazon の URL から、書名・著者名・出版社名を自動で入れられます。</p>` : ""}
     <div class="釦たち" style="margin-top:20px">
       <button class="釦 全幅" data-する="題を決める" ${w.出す && !w.選んだ ? "disabled" : ""}>${座る ? "ベンチに座る" : "替える"}</button>
     </div>`);
@@ -623,34 +627,9 @@ document.addEventListener("input", e=>{
   if(e.target.id !== "本をさがす" || !本窓) return;
   本窓.探す = e.target.value;
   const 候補 = document.getElementById("本の候補");
-  if(!候補) return;
-  if(/amazon\.|amzn\.|\/dp\//i.test(本窓.探す)) return Amazonで探す(本窓.探す, 候補);
-  候補.innerHTML = 本の候補();
+  if(候補) 候補.innerHTML = 本の候補();
 });
 
-/* 本をさがす欄に Amazon の URL が貼られたとき（2026-09-30 配信者「Amazon のリンクはどこで入れられますか？」）。
-   本棚にあればその本を1冊だけ候補に出す。無ければ「この本を申請する」を出し、押すと書誌の入った申請の窓を開く */
-async function Amazonで探す(url, 候補){
-  if(/link\.amazon|amzn\.to|amzn\.asia/.test(url))
-    return 候補.innerHTML = `<p class="注">短縮リンクは辿れません。一度開いて、出てきた URL を貼ってください。</p>`;
-  const asin = AmazonのASIN(url), isbn = asin && ISBN13にする(asin);
-  if(!isbn) return 候補.innerHTML = `<p class="注">${asin ? "Kindle 版などは書誌を引けません。紙の本の URL を貼ってください。" : "Amazon の URL から商品番号を読み取れませんでした。"}</p>`;
-  const 棚の本 = 本窓.本ら?.find(b=>ISBN13にする(b.isbn) === isbn);
-  if(棚の本){
-    本窓.選んだ = 棚の本;
-    候補.innerHTML = `<button class="本の候補の札 いま" data-する="本を選ぶ" data-本="${逃(棚の本.id)}">
-      <b>『${逃(棚の本.題)}』</b><span>${逃(本の見出し(棚の本))}</span></button>`;
-    const 釦 = document.querySelector("[data-する=題を決める]");
-    if(釦) 釦.disabled = false;
-    return;
-  }
-  候補.innerHTML = `<p class="注">本棚にはまだありません。さがしています…</p>`;
-  const r = await ISBNで確かめる(isbn);
-  if(本窓?.探す !== url) return;   // 待つあいだに打ち直された
-  候補.innerHTML = `<div class="申請の知らせ" style="margin:10px 0">本棚にはまだありません。
-    ${r ? `<br><b>『${逃(r.題)}』</b> ${逃(r.著)}／${逃(r.版元)}` : ""}
-    <div class="釦たち" style="margin-top:8px"><button class="釦 小" data-する="URLで申請をひらく" data-isbn="${isbn}">この本を申請する</button></div></div>`;
-}
 document.addEventListener("change", e=>{
   if(e.target.name !== "出すか" || !本窓) return;
   本窓.出す = e.target.value === "出す";
@@ -882,17 +861,6 @@ const 動き = {
     本の窓を描く();
   },
   申請をひらく: ()=>{ 本窓.申請 = true; 本の窓を描く(); document.getElementById("申題")?.focus(); },
-  // さがす欄に貼られた Amazon の URL から、書誌の入った申請の窓を開く
-  URLで申請をひらく: async el=>{
-    const url = 本窓.探す;
-    本窓.探す = "";
-    本窓.申請 = true;
-    本の窓を描く();
-    const 欄 = document.getElementById("申amazon");
-    if(欄) 欄.value = url;
-    document.getElementById("申isbn").value = el.dataset.isbn;
-    await 書誌を入れる(el.dataset.isbn);
-  },
   申請をとじる: ()=>{ 本窓.申請 = false; 本の窓を描く(); },
   申請して決める: async ()=>{
     const 値 = id => document.getElementById(id)?.value.trim() || "";

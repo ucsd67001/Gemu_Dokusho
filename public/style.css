@@ -285,6 +285,12 @@ h2.節見出し{font-size:17px;font-weight:600;letter-spacing:.09em;margin:0}
 .本の候補の札 span{font-family:var(--ゴシック);font-size:11.5px;color:var(--字のごく薄い)}
 .本の候補の札.いま{background:var(--灯の淡い);box-shadow:inset 3px 0 0 var(--灯)}
 
+/* 本の窓：一覧の下の「本の登録を申請する」。見落とされたのでボタンにした（2026-09-30 配信者） */
+.申請への入口{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px;
+  font-family:var(--ゴシック);font-size:12.5px;color:var(--字の薄い)}
+.申請への入口 .釦{color:var(--灯の濃い);box-shadow:inset 0 0 0 1px rgba(107,75,196,.45)}
+.申請への入口 .釦:hover{color:var(--灯の濃い);box-shadow:inset 0 0 0 1px var(--灯)}
+
 /* 本の申請：欄の右に小さな釦を並べる（Hongaeshi と同じ形） */
 .欄と釦{display:flex;gap:10px;align-items:flex-end}
 .欄と釦 .釦{white-space:nowrap}
