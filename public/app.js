@@ -970,7 +970,7 @@ const 動き = {
       ⚠️ 一度「画像を添付したい」と受け取り、パソコンはコピーして貼り付け、スマホは画像を保存…の手順を作ったが、
          取り違えだった。**保存や貼り付けの手順は要らない**（配信者）。
       ⚠️ スマホは、このページのまま X へ移る（新しい窓は止められて、X が立ち上がらなかった）
-   ⚠️ 絵に名前は入れない（ほかの人も写るため）。書名と時間と場所だけ */
+   ⚠️ 絵には座っている全員が写り、全員に名札（名前と題）を付ける（2026-09-30 配信者が許した） */
 let 読み終えの絵 = null, 読み終えの中身 = null;
 
 function 読み終える窓(){
@@ -996,7 +996,7 @@ function 読み終える窓(){
       <button class="釦 藤" data-する="投稿して終える" disabled>X に投稿して終える</button>
       <button class="釦 枠だけ" data-する="そのまま終える">投稿しないで終える</button>
     </div>
-    <p class="注">投稿には、この絵と、書名と、読んだ時間が入ります。名前は入りません。</p>`);
+    <p class="注">投稿には、この絵と、書名と、読んだ時間が入ります。絵には、その場にいる人の名前と本の題も写ります。</p>`);
   共有の絵を描く(題, 分, 場所).then(絵=>{
     読み終えの絵 = 絵;
     const 見本 = document.getElementById("共有の見本");
@@ -1035,11 +1035,11 @@ const 絵を読む = src => new Promise((ok, ng)=>{
 });
 
 // 長い題は … で切る（『』は残す）
-function 詰める(g, 文, 幅){
+function 詰める(g, 文, 幅, 終わり = "…』"){
   if(g.measureText(文).width <= 幅) return 文;
   let t = 文;
-  while(t.length > 2 && g.measureText(t + "…』").width > 幅) t = t.slice(0, -1);
-  return t + "…』";
+  while(t.length > 2 && g.measureText(t + 終わり).width > 幅) t = t.slice(0, -1);
+  return t + 終わり;
 }
 
 /* X に載る絵（1200×630。X の大きな画像の形）。場所の絵に、いま座っている人と空のベンチを描き、
@@ -1089,30 +1089,42 @@ async function 共有の絵を描く(題, 分, 場所){
     g.restore();
   }
 
-  // 自分の名札（名前と『題』）を、自分の足もとに。⚠️ ほかの人の名前は入れない（2026-09-27 配信者：自分の名前と題を出したい）
-  const 自分の席 = 状態.席ら.find(s=>s.uid === 状態.私.uid);
-  if(自分の席 && 部屋.席[自分の席.番]){
-    const 席 = 部屋.席[自分の席.番];
-    const 中 = W * 席.x / 100, 上 = ずらし + 高さ * 席.y / 100 + 6;
-    const 名 = 状態.自分?.名 || "";
-    g.font = '600 17px "Hiragino Sans","Yu Gothic UI","Yu Gothic",sans-serif';
-    const 名の幅 = Math.min(g.measureText(名).width, 260);
-    g.font = '400 17px "Zen Old Mincho", serif';
-    const 題の文 = 題 ? 詰める(g, `『${題}』`, 260) : "";
-    const 幅 = Math.max(名の幅, 題の文 ? g.measureText(題の文).width : 0) + 24, 丈 = 題の文 ? 56 : 34;
-    const 左 = Math.max(8, Math.min(W - 幅 - 8, 中 - 幅 / 2));
+  /* 名札（名前と『題』）を、座っている全員の足もとに（2026-09-30 配信者「他のユーザのユーザ名と書籍名も表示してOK」）。
+     場所の画面と同じ形：自分だけ紫の縁／同じベンチに2人いれば2人目の名札を1段下げる／長い題は … で切る。
+     ⚠️ 8人でも重ならないよう、幅は場所の画面と同じくらい（絵の幅の 12%）に詰める
+     （前は自分の名札だけを大きく描いていた。ほかの人の名前と本は入れていなかった） */
+  const 座られた番 = new Set(状態.席ら.map(s=>s.番));
+  const 名札の幅 = W * 0.12, 字 = 14;
+  for(const s of [...状態.席ら].sort((a, b)=>(部屋.席[a.番]?.y || 0) - (部屋.席[b.番]?.y || 0))){
+    const 席 = 部屋.席[s.番];
+    if(!席) continue;
+    const 自分 = s.uid === 状態.私.uid;
+    const 名 = (自分 ? 状態.自分?.名 : 状態.人々.get(s.uid)?.名) || "";
+    const 本の題 = 自分 ? 題 : s.題;
+    g.font = `600 ${字}px "Hiragino Sans","Yu Gothic UI","Yu Gothic",sans-serif`;
+    const 名の文 = 詰める(g, 名, 名札の幅 - 12, "…");
+    const 名の幅 = g.measureText(名の文).width;
+    g.font = `400 ${字}px "Zen Old Mincho", serif`;
+    const 題の文 = 本の題 ? 詰める(g, `『${本の題}』`, 名札の幅 - 12) : "";
+    const 幅 = Math.max(名の幅, 題の文 ? g.measureText(題の文).width : 0) + 14, 丈 = 題の文 ? 44 : 26;
+    const 下段 = 席.隣 && 座られた番.has(席.相方);
+    const 中 = W * 席.x / 100;
+    const 上 = ずらし + 高さ * 席.y / 100 + 4 + (下段 ? 丈 + 6 : 0);
+    const 左 = Math.max(4, Math.min(W - 幅 - 4, 中 - 幅 / 2));
     g.fillStyle = "rgba(255,253,255,.94)";
     g.fillRect(左, 上, 幅, 丈);
-    g.strokeStyle = "#6b4bc4";
-    g.lineWidth = 1.5;
+    g.strokeStyle = 自分 ? "#6b4bc4" : "rgba(38,28,66,.3)";
+    g.lineWidth = 自分 ? 1.5 : 1;
     g.strokeRect(左 + .75, 上 + .75, 幅 - 1.5, 丈 - 1.5);
     g.textAlign = "center";
     g.fillStyle = "#17141f";
-    g.font = '600 17px "Hiragino Sans","Yu Gothic UI","Yu Gothic",sans-serif';
-    g.fillText(名, 左 + 幅 / 2, 上 + 23, 260);
-    g.fillStyle = "#59526b";
-    g.font = '400 17px "Zen Old Mincho", serif';
-    g.fillText(題の文, 左 + 幅 / 2, 上 + 46);
+    g.font = `600 ${字}px "Hiragino Sans","Yu Gothic UI","Yu Gothic",sans-serif`;
+    g.fillText(名の文, 左 + 幅 / 2, 上 + 18);
+    if(題の文){
+      g.fillStyle = "#59526b";
+      g.font = `400 ${字}px "Zen Old Mincho", serif`;
+      g.fillText(題の文, 左 + 幅 / 2, 上 + 36);
+    }
   }
 
   // 上の紙の帯
