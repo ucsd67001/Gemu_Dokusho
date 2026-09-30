@@ -170,12 +170,14 @@ function 席を合わせる(部屋, 席ら){
 
 
 let いま = null;   // { 部屋, 番, 入った, 区切り }。記録は「読み終える」のときだけ（土台.js と同じ）
-export async function 座る(部屋, 題, 席の数, 本 = ""){
+// 順：座ってみる席の番号の並び（画面の 座る順 が、空いたベンチを優先してランダムに決める）。数なら 0,1,2… の順
+export async function 座る(部屋, 題, 順, 本 = ""){
+  const 番ら = typeof 順 === "number" ? [...Array(順).keys()] : 順;
   await 立つ();
   const s = 読む();
   const 席ら = s.席[部屋] ||= {};
   for(const [番, x] of Object.entries(席ら)) if(x.uid === 私.uid) delete 席ら[番];
-  for(let 番 = 0; 番 < 席の数; 番++){
+  for(const 番 of 番ら){
     const x = 席ら[番];
     if(x && x.uid !== 私.uid && 生きた席(x)) continue;
     席ら[番] = { uid:私.uid, 題, 本, 入った:Date.now(), 見た:Date.now() };

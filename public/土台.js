@@ -185,13 +185,15 @@ function 席を合わせる(部屋, 席ら){
       （前は座った瞬間に記録を作り、1分ごとに延ばしていた。閉じただけの回も残っていた） */
 let いま = null;   // { 部屋, 番, 入った, 区切り:[{ 題, 本, 始め }] }　題が空＝名札に出さない
 
-export async function 座る(部屋, 題, 席の数, 本 = ""){
+// 順：座ってみる席の番号の並び（画面の 座る順 が、空いたベンチを優先してランダムに決める）。数なら 0,1,2… の順
+export async function 座る(部屋, 題, 順, 本 = ""){
+  const 番ら = typeof 順 === "number" ? [...Array(順).keys()] : 順;
   await 立つ();
   // ほかのタブで座ったままの自分の席を片づける
   const 今の席ら = await getDocs(collection(db, "rooms", 部屋, "seats"));
   await Promise.all(今の席ら.docs.filter(d=>d.data().uid === 私.uid).map(d=>deleteDoc(d.ref)));
 
-  for(let 番 = 0; 番 < 席の数; 番++){
+  for(const 番 of 番ら){
     const r = doc(db, "rooms", 部屋, "seats", String(番));
     try{
       await runTransaction(db, async tx=>{
