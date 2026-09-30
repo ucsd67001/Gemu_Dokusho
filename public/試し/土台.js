@@ -271,7 +271,15 @@ export async function 読み方を読む(){
   const 上位 = k => [...計].filter(([uid, v])=>Math.round(v[k]) > 0 && s.人[uid])
     .sort((a, b)=>b[1][k] - a[1][k]).slice(0, 3)
     .map(([uid, v])=>({ uid, 名:s.人[uid].名, 顔:s.人[uid].アバター?.顔 || "", 数:Math.round(v[k]) }));
-  return { 冊:上位("冊"), ページ:上位("ページ"), 分:上位("分") };
+  // 本のランキング（土台.js と同じく、本ごとに。試しの仲間の分も少し）
+  const 本の計 = new Map([["銀河鉄道の夜", { 読了:2, ページ:540, 分:180 }]]);
+  const 本に足す = (題, k, v)=>{ if(!題 || 題 === 題を出さない印) return; const y = 本の計.get(題) || { 読了:0, ページ:0, 分:0 }; y[k] += v; 本の計.set(題, y); };
+  for(const r of s.記録) 本に足す(r.題, "分", Math.max(0, r.終わり - r.始め) / 60000);
+  for(const r of (s.読了 || [])){ 本に足す(r.題, "読了", 1); 本に足す(r.題, "ページ", r.ページ || 0); }
+  const 本の上位 = k => [...本の計].filter(([, v])=>Math.round(v[k]) > 0)
+    .sort((a, b)=>b[1][k] - a[1][k]).slice(0, 3).map(([題, v])=>({ 題, 数:Math.round(v[k]) }));
+  return { 冊:上位("冊"), ページ:上位("ページ"), 分:上位("分"),
+    本:{ 読了:本の上位("読了"), ページ:本の上位("ページ"), 分:本の上位("分") } };
 }
 export async function 記録を読む(){
   return 読む().記録.filter(x=>x.uid === 私.uid)

@@ -13,7 +13,8 @@
                    （向きを記録する前に作ったアバターのため。画面が一度だけ呼ぶ）
      borrowImages  アバターの絵を data URL で返す（読み終えたときの X 用の絵を、画面の canvas で描くため）
      sharePage     読書の記録ページ /s/{id}。X がリンクから絵（og:image）を読み取って、投稿に大きく出す
-     readerStats   「読み方は、人それぞれ」：読了した冊数・読了した本の総ページ数・読んだ時間の、それぞれ上位3人
+     readerStats   「読み方は、人それぞれ」：読了した冊数・読了した本の総ページ数・読んだ時間の、それぞれ上位3人。
+                   あわせて「本のランキング」：本ごとの読了の数・読まれたページの数・読まれた時間の、それぞれ上位3冊
 
    ⚠️⚠️ **写真はどこにも残さない。**受け取って OpenAI に渡すだけ。
       残すのは出来上がった絵（Storage の avatars/{uid}/{版}/）だけ。
@@ -337,8 +338,8 @@ p{margin:18px 0 0}a{color:#513397}</style></head>
 export const readerStats = onCall({ region: "asia-northeast1" }, async req => {
   if(!req.auth) throw new HttpsError("unauthenticated", "ログインしてください");
   const [logs, fins, users] = await Promise.all([
-    db.collection("logs").select("uid", "from", "to").get(),
-    db.collection("finishes").select("uid", "pages").get(),
+    db.collection("logs").select("uid", "from", "to", "title", "book").get(),
+    db.collection("finishes").select("uid", "pages", "title", "book").get(),
     db.collection("users").get(),
   ]);
   const 計 = new Map();
@@ -348,21 +349,39 @@ export const readerStats = onCall({ region: "asia-northeast1" }, async req => {
     x[k] += v;
     計.set(uid, x);
   };
+  /* 本のランキング（2026-10-01 配信者）：本を起点に、読了の数・読まれたページの数・読まれた時間。
+     本は id（book）でまとめ、id の無い記録は書籍名でまとめる。**だれが読んだかは返さない。**
+     ⚠️ 書籍名を出さずに読んだ回（題を出さない印）はどの本か分からないので数えない */
+  const 題を出さない印 = "（題を出さずに読んだ本）";
+  const 本の計 = new Map();
+  const 本に足す = (x, k, v) => {
+    if(!x.title || x.title === 題を出さない印) return;
+    const 鍵 = x.book || "t:" + x.title;
+    const y = 本の計.get(鍵) || { title: x.title, finishes: 0, pages: 0, minutes: 0 };
+    y[k] += v;
+    本の計.set(鍵, y);
+  };
   logs.forEach(d => {
     const x = d.data();
     const ms = (x.to?.toMillis?.() || 0) - (x.from?.toMillis?.() || 0);
-    if(ms > 0) 足す(x.uid, "minutes", ms / 60000);
+    if(ms > 0){ 足す(x.uid, "minutes", ms / 60000); 本に足す(x, "minutes", ms / 60000); }
   });
   fins.forEach(d => {
     const x = d.data();
     足す(x.uid, "books", 1);
     足す(x.uid, "pages", Number(x.pages) || 0);
+    本に足す(x, "finishes", 1);
+    本に足す(x, "pages", Number(x.pages) || 0);
   });
+  const 本の上位 = k => [...本の計.values()].filter(v => Math.round(v[k]) > 0)
+    .sort((a, b) => b[k] - a[k]).slice(0, 3)
+    .map(v => ({ title: v.title, value: Math.round(v[k]) }));
   const 人 = new Map(users.docs.map(d => [d.id, d.data()]));
   const 上位 = k => [...計].filter(([uid, v]) => Math.round(v[k]) > 0 && 人.has(uid))
     .sort((a, b) => b[1][k] - a[1][k]).slice(0, 3)
     .map(([uid, v]) => ({ uid, name: 人.get(uid).name || "", face: 人.get(uid).avatar?.face || "", value: Math.round(v[k]) }));
-  return { books: 上位("books"), pages: 上位("pages"), minutes: 上位("minutes") };
+  return { books: 上位("books"), pages: 上位("pages"), minutes: 上位("minutes"),
+    bookRank: { finishes: 本の上位("finishes"), pages: 本の上位("pages"), minutes: 本の上位("minutes") } };
 });
 
 /* ── 道具 ─────────────────────────────── */

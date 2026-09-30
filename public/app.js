@@ -265,6 +265,11 @@ function 廊下(){
     </div>
   </section>
   <section class="節">
+    <div class="節の頭"><h2 class="節見出し">本のランキング</h2><p class="節の添え">これまでの全部</p></div>
+    <p class="注">本の側から見た数です。だれが読んだかは出しません。</p>
+    <div class="読み方" id="本のランキング">${待ちの画面("数えています")}</div>
+  </section>
+  <section class="節">
     <div class="節の頭"><h2 class="節見出し">読み方は、人それぞれ</h2><p class="節の添え">これまでの全部</p></div>
     <p class="注">競うものではありません。たくさんの本を読む人、厚い本を読む人、長い時間をかける人。いろいろな読み方の人がいます。</p>
     <div class="読み方" id="読み方">${待ちの画面("数えています")}</div>
@@ -292,6 +297,27 @@ function 廊下(){
   }
 }
 
+/* 本のランキング（2026-10-01 配信者「本を起点として、読了の数、読まれたページの数、読まれた時間で」）。
+   「読み方は、人それぞれ」と同じ3列の形。本は順位つき（人のほうは順位を付けない）。だれが読んだかは出さない */
+function 本のランキングを描く(本){
+  const 置き場 = document.getElementById("本のランキング");
+  if(!置き場) return;
+  if(!本) return 置き場.innerHTML = `<p class="注">いまは数えられませんでした。</p>`;
+  const 時間に = 分 => 分 >= 60 ? `${Math.floor(分 / 60)}時間${分 % 60 ? (分 % 60) + "分" : ""}` : `${分}分`;
+  const 列 = (見出し, 本ら, 単位) => `
+    <div class="読み方の列">
+      <h3>${見出し}</h3>
+      ${本ら.length ? 本ら.map((x, i)=>`<div class="読み方の人">
+        <span class="順位">${i + 1}</span>
+        <span class="名 書籍名">『${逃(x.題)}』</span><span class="数">${単位(x.数)}</span></div>`).join("")
+        : `<p class="注">まだありません</p>`}
+    </div>`;
+  置き場.innerHTML =
+    列("読了の数", 本.読了, n=>`${n}回`) +
+    列("読まれたページの数", 本.ページ, n=>`${n.toLocaleString()}ページ`) +
+    列("読まれた時間", 本.分, 時間に);
+}
+
 /* 読み方は、人それぞれ（2026-09-29 配信者）。
    ⚠️ 順位の数字は付けない。3つの列を横に並べ、どれが上ということもない形にする */
 async function 読み方を描く(){
@@ -299,6 +325,7 @@ async function 読み方を描く(){
   try{ r = await 土台.読み方を読む(); }catch(e){ console.error(e); r = null; }
   const 置き場 = document.getElementById("読み方");
   if(!置き場) return;
+  本のランキングを描く(r?.本);
   if(!r) return 置き場.innerHTML = `<p class="注">いまは数えられませんでした。</p>`;
   const 時間に = 分 => 分 >= 60 ? `${Math.floor(分 / 60)}時間${分 % 60 ? (分 % 60) + "分" : ""}` : `${分}分`;
   const 列 = (見出し, 人ら, 単位) => `
