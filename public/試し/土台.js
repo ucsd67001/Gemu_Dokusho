@@ -192,7 +192,6 @@ export async function 立つ({ 記録する = false, 読了 = null } = {}){
 }
 export const 座っている = () => いま ? { ...いま } : null;
 
-export async function 古い記録を消す(){ return 0; }
 export const 題を出さない印 = "（題を出さずに読んだ本）";
 // 本（土台.js と同じ形）。試しの人は管理者でもある（管理の頁を試すため）
 const 本ら = s => Object.entries(s.本 ||= {}).map(([id, x])=>({ id, 題:x.題, 著:x.著, 版元:x.版元 || "",

@@ -292,16 +292,6 @@ export async function 申請を決める(id, 承認, 直し = {}){
 
 /* ── 記録 ─────────────────────────────── */
 
-/* ⚠️ 今回だけ（2026-09-29 配信者「今日より前の記録は全部消して」）。
-   「読み終えたときだけ記録する」決まりの前の記録（閉じただけの回が混ざる）を、本人の分だけ消す。
-   ルール（firestore.rules の logs の delete）と同じ境目。二人とも消し終えたら、ここと呼び出しとルールを外す */
-const 古い記録の境目 = 1790607600000;   // 2026-09-29 0:00（日本時間）
-export async function 古い記録を消す(){
-  const s = await getDocs(query(collection(db, "logs"),
-    where("uid", "==", 私.uid), where("from", "<", Timestamp.fromMillis(古い記録の境目)), orderBy("from", "desc")));
-  await Promise.all(s.docs.map(d=>deleteDoc(d.ref)));
-  return s.size;
-}
 
 export async function 読了を読む(){
   const s = await getDocs(query(collection(db, "finishes"), where("uid", "==", 私.uid)));
