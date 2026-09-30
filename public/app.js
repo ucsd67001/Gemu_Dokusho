@@ -169,7 +169,7 @@ function 入口(){
     </div>
     <p class="注">${試しか
       ? "これは試しです。この端末のブラウザの中だけで動きます。タブを2つ開くと、2人で入れます。"
-      : "はじめて入るときに、名前と写真を決めます。"}</p>
+      : "はじめて入るときに、ユーザ名と写真を決めます。"}</p>
   </section>`;
 }
 
@@ -195,8 +195,8 @@ function 登録(){
   <section class="幕 帳">
     <p class="英字の札">Welcome</p>
     <h1 class="中見出し">はじめまして</h1>
-    <p class="導き">名前と写真を決めると、写真をもとに、ブロックの姿のアバターを作ります。</p>
-    <label class="名札" for="名の欄">名前（ベンチの名札に出ます）</label>
+    <p class="導き">ユーザ名と写真を決めると、写真をもとに、ブロックの姿のアバターを作ります。</p>
+    <label class="名札" for="名の欄">ユーザ名（アバターの足もとに出ます）</label>
     <input id="名の欄" class="欄" maxlength="20" placeholder="例：しおり" value="${逃(状態.自分?.名 || "")}">
     ${写真の欄()}
     ${誤り ? `<p class="誤りの字">${逃(誤り)}</p>` : ""}
@@ -447,7 +447,7 @@ function 部屋を描き直す(){
     const 人 = 状態.人々.get(s.uid);
     return `<div class="居る">${顔の絵(人, "中")}
       <span class="名">${逃(人?.名 || "…")}</span>
-      <span class="題">${s.題 ? `『${逃(s.題)}』` : `<span class="注">（題は出していません）</span>`}</span>
+      <span class="題">${s.題 ? `『${逃(s.題)}』` : `<span class="注">（書籍名は出していません）</span>`}</span>
       <span class="時">${分に(Date.now() - s.入った)}</span></div>`;
   }).join("") : `<p class="注">まだ誰もいません。</p>`;
   絵を入れる(列);
@@ -489,7 +489,7 @@ function 手もとを描く(){
   const 題 = 状態.席ら.find(s=>s.uid === 状態.私.uid)?.題 ?? "";
   el.innerHTML = `<div class="手もと">
     ${顔の絵(状態.自分, "中")}
-    <div class="何を"><div class="書名">${題 ? `『${逃(題)}』` : "題は名札に出していません"}</div>
+    <div class="何を"><div class="書名">${題 ? `『${逃(題)}』` : "書籍名は出していません"}</div>
       <div class="時">読みはじめて ${分に(Date.now() - 席.入った)}</div></div>
     <div class="釦たち">
       <button class="釦 枠だけ 小" data-する="本を替える">本を替える</button>
@@ -546,14 +546,14 @@ function 本の窓を描く(){
       <input id="申amazon" class="欄" placeholder="https://www.amazon.co.jp/…/dp/4166612476">
       <button class="釦 枠だけ 小" data-する="Amazonから読む">読み取る</button>
     </div>
-    <p class="注">紙の本の URL なら、書名・著者名・出版社名を自動で入れます。短縮リンク（amzn.to/… など）は、一度開いて出てきた URL を貼ってください。<b>リンク自体は保存しません。</b></p>
+    <p class="注">紙の本の URL なら、書籍名・著者名・出版社名を自動で入れます。短縮リンク（amzn.to/… など）は、一度開いて出てきた URL を貼ってください。<b>リンク自体は保存しません。</b></p>
     <label class="名札" for="申isbn">ISBN（わかれば。あると確実です）</label>
     <div class="欄と釦">
       <input id="申isbn" class="欄" maxlength="20" inputmode="numeric" placeholder="9784166612475">
       <button class="釦 枠だけ 小" data-する="ISBNを確かめる">確かめる</button>
     </div>
     <div id="申請の確認"></div>
-    <label class="名札" for="申題">書名（必須）</label>
+    <label class="名札" for="申題">書籍名（必須）</label>
     <input id="申題" class="欄" maxlength="120" value="${逃(w.探す)}">
     <label class="名札" for="申著">著者名（必須）</label>
     <input id="申著" class="欄" maxlength="80">
@@ -561,25 +561,25 @@ function 本の窓を描く(){
     <input id="申版元" class="欄" maxlength="80">
     <label class="名札" for="申ひとこと">ひとこと（任意）</label>
     <input id="申ひとこと" class="欄" maxlength="300" placeholder="例）文庫版です">
-    <p class="注">書名だけでは別の本と取り違えるので、著者名と出版社名もお願いしています。</p>
+    <p class="注">書籍名だけでは別の本と取り違えるので、著者名と出版社名もお願いしています。</p>
     <div class="釦たち" style="margin-top:20px">
       <button class="釦 全幅" data-する="申請して決める" ${w.送信中 ? "disabled" : ""}>${w.送信中 ? "送っています…" : 座る ? "申請して、この本で座る" : "申請して、この本に替える"}</button>
       <button class="釦 枠だけ 全幅" data-する="申請をとじる">一覧に戻る</button>
     </div>`);
   窓を出す(座る ? "いま読む本" : "本を替える", `
     <div class="出すか">
-      <label><input type="radio" name="出すか" value="出す" ${w.出す ? "checked" : ""}> 読んでいる本の題を、名札に出す</label>
-      <label><input type="radio" name="出すか" value="伏せる" ${w.出す ? "" : "checked"}> 題は出さない（名札は名前だけ）</label>
+      <label><input type="radio" name="出すか" value="出す" ${w.出す ? "checked" : ""}> ユーザ名と書籍名を出す</label>
+      <label><input type="radio" name="出すか" value="伏せる" ${w.出す ? "" : "checked"}> ユーザ名だけを出す（書籍名は出さない）</label>
     </div>
     ${w.出す ? `
       <label class="名札" for="本をさがす">本をさがす</label>
-      <input id="本をさがす" class="欄" placeholder="書名か著者名" value="${逃(w.探す)}" autocomplete="off">
+      <input id="本をさがす" class="欄" placeholder="書籍名か著者名" value="${逃(w.探す)}" autocomplete="off">
       <div class="本の候補" id="本の候補">${本の候補()}</div>
       <div class="申請への入口">
         <span>一覧に無いときは</span>
         <button class="釦 枠だけ 小" data-する="申請をひらく">＋ 本の登録を申請する</button>
       </div>
-      <p class="注" style="margin-top:4px">Amazon の URL から、書名・著者名・出版社名を自動で入れられます。</p>` : ""}
+      <p class="注" style="margin-top:4px">Amazon の URL から、書籍名・著者名・出版社名を自動で入れられます。</p>` : ""}
     <div class="釦たち" style="margin-top:20px">
       <button class="釦 全幅" data-する="題を決める" ${w.出す && !w.選んだ ? "disabled" : ""}>${座る ? "ベンチに座る" : "替える"}</button>
     </div>`);
@@ -602,7 +602,7 @@ async function 書誌を入れる(isbn){
   const 入れる = (id, v)=>{ const e = document.getElementById(id); if(e && v) e.value = v; };
   入れる("申題", r.題); 入れる("申著", r.著); 入れる("申版元", r.版元); 入れる("申isbn", r.isbn);
   if(本窓) 本窓.申請のページ = r.ページ || 0;
-  出す(`<div class="申請の知らせ">見つかりました。書名・著者名・出版社名を入れました。<br>
+  出す(`<div class="申請の知らせ">見つかりました。書籍名・著者名・出版社名を入れました。<br>
     <b>『${逃(r.題)}』</b> ${逃(r.著)}／${逃(r.版元)}${r.年 ? `・${逃(r.年)}` : ""}${r.ページ ? `・${r.ページ}ページ` : ""}</div>`);
 }
 
@@ -733,9 +733,9 @@ async function 管理の頁(){
   if(!申請ら.length) return 列.innerHTML = `<p class="注" style="margin-top:24px">いま、申請はありません。</p>`;
   列.innerHTML = `<div class="申請の列">${申請ら.map(b=>`
     <div class="申請">
-      <div class="申請の素性">申請：${逃(状態.人々.get(b.申請者)?.名 || "（名前なし）")}
+      <div class="申請の素性">申請：${逃(状態.人々.get(b.申請者)?.名 || "（ユーザ名なし）")}
         ${b.isbn ? `／ISBN ${逃(b.isbn)}` : ""}${b.ひとこと ? `／「${逃(b.ひとこと)}」` : ""}</div>
-      <label class="名札">書名</label><input class="欄" id="管題-${逃(b.id)}" maxlength="120" value="${逃(b.題)}">
+      <label class="名札">書籍名</label><input class="欄" id="管題-${逃(b.id)}" maxlength="120" value="${逃(b.題)}">
       <label class="名札">著者名</label><input class="欄" id="管著-${逃(b.id)}" maxlength="80" value="${逃(b.著)}">
       <label class="名札">出版社名</label><input class="欄" id="管版元-${逃(b.id)}" maxlength="80" value="${逃(b.版元)}">
       ${b.isbn ? `<div class="釦たち" style="margin-top:10px">
@@ -787,9 +787,9 @@ function 自分の頁(){
     </div>
   </section>
   <section class="節 帳">
-    <div class="節の頭"><h2 class="節見出し">名前</h2></div>
+    <div class="節の頭"><h2 class="節見出し">ユーザ名</h2></div>
     <input id="名の欄" class="欄" maxlength="20" value="${逃(自分.名)}" style="margin-top:14px">
-    <div class="釦たち" style="margin-top:16px"><button class="釦 小" data-する="名を直す">名前を直す</button></div>
+    <div class="釦たち" style="margin-top:16px"><button class="釦 小" data-する="名を直す">ユーザ名を直す</button></div>
   </section>
   <section class="節">
     <div class="節の頭"><h2 class="節見出し">アバター</h2><p class="節の添え">作り直せるのは1日5回まで</p></div>
@@ -828,7 +828,7 @@ async function 写真を縮める(ファイル){
 
 function 名を読む(){
   const 名 = document.getElementById("名の欄")?.value.trim() || "";
-  if(!名){ 知らせる("名前を入れてください", true); return null; }
+  if(!名){ 知らせる("ユーザ名を入れてください", true); return null; }
   return 名;
 }
 
@@ -865,7 +865,7 @@ const 動き = {
   作り直す: ()=>作る(null),
   名を直す: async ()=>{
     const 名 = 名を読む(); if(!名) return;
-    try{ await 土台.名を決める(名); 知らせる("名前を直しました"); }
+    try{ await 土台.名を決める(名); 知らせる("ユーザ名を直しました"); }
     catch(e){ 知らせる("直せませんでした", true); }
   },
   向きを反対にする: async ()=>{
@@ -891,7 +891,7 @@ const 動き = {
     const 値 = id => document.getElementById(id)?.value.trim() || "";
     const 申 = { 題:値("申題"), 著:値("申著"), 版元:値("申版元"), isbn:値("申isbn").replace(/[^0-9Xx]/g, ""), ひとこと:値("申ひとこと"),
       ページ:本窓.申請のページ || 0 };
-    if(!申.題 || !申.著 || !申.版元) return 知らせる("書名・著者名・出版社名を入れてください", true);
+    if(!申.題 || !申.著 || !申.版元) return 知らせる("書籍名・著者名・出版社名を入れてください", true);
     本窓.送信中 = true;
     本の窓を描く();
     try{
@@ -996,7 +996,7 @@ function 読み終える窓(){
       <button class="釦 藤" data-する="投稿して終える" disabled>X に投稿して終える</button>
       <button class="釦 枠だけ" data-する="そのまま終える">投稿しないで終える</button>
     </div>
-    <p class="注">投稿には、この絵と、書名と、読んだ時間が入ります。絵には、その場にいる人の名前と本の題も写ります。</p>`);
+    <p class="注">投稿には、この絵と、書籍名と、読んだ時間が入ります。絵には、その場にいる人のユーザ名と書籍名も写ります。</p>`);
   共有の絵を描く(題, 分, 場所).then(絵=>{
     読み終えの絵 = 絵;
     const 見本 = document.getElementById("共有の見本");
