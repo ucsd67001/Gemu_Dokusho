@@ -83,7 +83,7 @@ service cloud.firestore {
     match /rooms/{room}/seats/{seat} {
       function stale() { return resource.data.seen < request.time - duration.value(3, 'm'); }
       function shape() {
-        return request.resource.data.keys().hasOnly(['uid', 'title', 'since', 'seen'])
+        return request.resource.data.keys().hasOnly(['uid', 'title', 'since', 'seen', 'book'])   // book＝本の id（別の端末が本を引き継ぐため）
           && request.resource.data.uid == request.auth.uid
           && shortText(request.resource.data.title, 120)   // 空＝題を名札に出さない
           && request.resource.data.seen == request.time

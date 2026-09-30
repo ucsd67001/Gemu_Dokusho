@@ -142,15 +142,41 @@ export async function 絵のURL(道){
    ⚠️ 1分ごとに seen を延ばす。3分延びていない席は空きとみなす（タブを閉じた人の席）。 */
 function 席に(d){
   const x = d.data() || {};
-  return { 番:Number(d.id), uid:x.uid, 題:x.title || "",
+  return { 番:Number(d.id), uid:x.uid, 題:x.title || "", 本:x.book || "",
     入った:x.since?.toMillis?.() || Date.now(), 見た:x.seen?.toMillis?.() || Date.now() };
 }
 const 生きた席 = 席 => Date.now() - 席.見た < 古いとみなす;
 
-export function 席を見張る(部屋, 届いたら){
+// 届いたら(席ら, 出来事)。出来事は "ほかで立った"／"ほかで座っていた"／null
+// ⚠️ 突き合わせる（合わせる：true）のは、場所の中にいるときだけ。一覧を見ているだけの端末を、座っている扱いに戻さない
+export function 席を見張る(部屋, 届いたら, { 合わせる = false } = {}){
   return onSnapshot(collection(db, "rooms", 部屋, "seats"),
-    s=>届いたら(s.docs.map(席に).filter(生きた席)),
+    s=>{ const 席ら = s.docs.map(席に).filter(生きた席); 届いたら(席ら, 合わせる ? 席を合わせる(部屋, 席ら) : null); },
     e=>console.error(e));
+}
+
+/* ⚠️⚠️ 同じ人が PC とスマホの両方で開いたとき（2026-09-30 配信者「本を替えるが効かない」「PC とスマホで整合が取れない」）。
+   前は、あとから座った端末が前の端末の席を消すのに、**前の端末は座っているつもりのまま**だった
+   （「本を替える」は消えた席を書き換えようとして失敗し、「生きている」も空振りしていた）。
+   → 席の様子が届くたびに、この端末の いま と、データベースの自分の席を突き合わせる：
+     ・ほかの端末で座っている → この端末も、その席に座っている扱いにする（どちらからでも替えられ、読み終えられる）
+     ・ほかの端末で本を替えた → この端末の区切りにも足す（記録が本ごとに正しく分かれる）
+     ・ほかの端末で席を立った → この端末も立った扱いにする（届いたらに "ほかで立った" を渡す） */
+function 席を合わせる(部屋, 席ら){
+  const 自分の席 = 席ら.find(s=>s.uid === 私?.uid);
+  if(いま && いま.部屋 === 部屋){
+    if(!自分の席 || 自分の席.番 !== いま.番){ いま = null; return "ほかで立った"; }
+    const 前 = いま.区切り.at(-1);
+    if(自分の席.題 !== 前.題 || (自分の席.本 || "") !== (前.本 || ""))
+      いま.区切り.push({ 題:自分の席.題, 本:自分の席.本 || "", 始め:Date.now() });
+    return null;
+  }
+  if(!いま && 自分の席){
+    いま = { 部屋, 番:自分の席.番, 入った:自分の席.入った,
+      区切り:[{ 題:自分の席.題, 本:自分の席.本 || "", 始め:自分の席.入った }] };
+    return "ほかで座っていた";
+  }
+  return null;
 }
 
 /* ⚠️⚠️ 読んだ時間の記録は、**「読み終える」で終えたときだけ**書く（2026-09-29 配信者）。
@@ -174,7 +200,7 @@ export async function 座る(部屋, 題, 席の数, 本 = ""){
           const 席 = 席に(s);
           if(席.uid !== 私.uid && 生きた席(席)) throw new Error("塞がっている");
         }
-        tx.set(r, { uid:私.uid, title:題, since:serverTimestamp(), seen:serverTimestamp() });
+        tx.set(r, { uid:私.uid, title:題, since:serverTimestamp(), seen:serverTimestamp(), ...(本 ? { book:本 } : {}) });
       });
     }catch(e){ continue; }
     const 今 = Date.now();
@@ -185,9 +211,16 @@ export async function 座る(部屋, 題, 席の数, 本 = ""){
 }
 
 export async function 題を替える(題, 本 = ""){
-  if(!いま) return;
-  await updateDoc(doc(db, "rooms", いま.部屋, "seats", String(いま.番)), { title:題, seen:serverTimestamp() });
-  いま.区切り.push({ 題, 本, 始め:Date.now() });
+  if(!いま) throw new Error("座っていません");
+  // ⚠️ 区切りは書く前に足す（書いた瞬間に届く席の様子で、同じ区切りが二重に足されないように）
+  const 区切り = { 題, 本, 始め:Date.now() };
+  いま.区切り.push(区切り);
+  try{
+    await updateDoc(doc(db, "rooms", いま.部屋, "seats", String(いま.番)), { title:題, book:本 || "", seen:serverTimestamp() });
+  }catch(e){
+    if(いま) いま.区切り = いま.区切り.filter(k=>k !== 区切り);
+    throw e;
+  }
 }
 
 export async function 生きている(){
@@ -202,6 +235,11 @@ export const 題を出さない印 = "（題を出さずに読んだ本）";
 export async function 立つ({ 記録する = false, 読了 = null } = {}){
   if(!いま) return;
   const 席 = いま; いま = null;
+  /* ⚠️ 席を消すのは「読み終える」（記録する）のときだけ（2026-09-30）。
+        頁を離れた・タブを閉じた・ログアウトは、**この端末が座っているつもりをやめるだけ。**
+        ほかの端末で読み続けていれば、その端末が「生きている」を送って席を保つ。どこも読んでいなければ3分で空く。
+        （前は離れるたびに席を消していて、スマホのタブを閉じると PC で読んでいる席まで消えた） */
+  if(!記録する) return;
   const 書く = [];
   if(記録する){
     const 終わり = Date.now();
