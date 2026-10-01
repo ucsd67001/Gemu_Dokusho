@@ -550,12 +550,17 @@ async function 題の窓(やること){
   本の窓を描く();
 }
 
+function 絞った本ら(){
+  const w = 本窓;
+  const 語 = w.探す.trim().toLowerCase();
+  return (w.本ら || []).filter(b=>!語 || (b.題 + " " + (b.副題 || "") + " " + b.著).toLowerCase().includes(語))
+    .sort((a, b)=>a.題.localeCompare(b.題, "ja")).slice(0, 50);
+}
+
 function 本の候補(){
   const w = 本窓;
   if(w.本ら === null) return 待ちの画面("本棚を読んでいます");
-  const 語 = w.探す.trim().toLowerCase();
-  const 候補 = w.本ら.filter(b=>!語 || (b.題 + " " + (b.副題 || "") + " " + b.著).toLowerCase().includes(語))
-    .sort((a, b)=>a.題.localeCompare(b.題, "ja")).slice(0, 50);
+  const 候補 = 絞った本ら();
   if(!候補.length) return `<p class="注">見つかりません。</p>`;
   return 候補.map(b=>`<button class="本の候補の札 ${w.選んだ?.id === b.id ? "いま" : ""}" data-する="本を選ぶ" data-本="${逃(b.id)}">
     <b>『${逃(b.題)}』</b><span>${逃(本の見出し(b))}</span></button>`).join("");
@@ -609,7 +614,8 @@ function 本の窓を描く(){
       </div>
       <p class="注" style="margin-top:4px">Amazon の URL から、書籍名・著者名・出版社名を自動で入れられます。</p>` : ""}
     <div class="釦たち" style="margin-top:20px">
-      <button class="釦 全幅" data-する="題を決める" ${w.出す && !w.選んだ ? "disabled" : ""}>${座る ? "ベンチに座る" : "替える"}</button>
+      ${w.出す ? `<p class="選んでいる本" id="選んでいる本">${選んでいる本の字(w)}</p>` : ""}
+      <button class="釦 全幅 決める釦" id="決める釦" data-する="題を決める" ${w.出す && !w.選んだ ? "disabled" : ""}>${決める釦の字(w)}</button>
     </div>`);
 }
 
@@ -675,12 +681,37 @@ async function 本で決める(el){
   }
 }
 
+/* ⚠️⚠️ 選んだ本の取り違え（2026-10-01 配信者「『推し、燃ゆ』を選んだのに『「知」のソフトウェア』が出た」）。
+   前に選んだ本を、はじめから選んだ状態にしている。絞り込むとその本は一覧から見えなくなるのに、**裏では選ばれたまま**で、
+   「ベンチに座る」も押せた。しかも iPhone では、日本語を確定するひと押しで候補が描き直され、押した候補が選ばれなかった。
+   → ①いま選んでいる本を、釦のすぐ上と釦の字にいつも出す ②絞り込んで見えなくなった本は、選んでいない状態に戻す
+     ③候補の中身が変わらないときは描き直さない（確定のひと押しで、押した候補を入れ替えない） */
+const 選んでいる本の字 = w => w.選んだ
+  ? `選んでいる本：<b>『${逃(w.選んだ.題)}』</b> ${逃(w.選んだ.著)}` : "本を選んでください";
+const 決める釦の字 = w => {
+  const 座る = w.やること === "席に着く";
+  if(!w.出す) return 座る ? "ユーザ名だけで座る" : "ユーザ名だけにする";
+  if(!w.選んだ) return 座る ? "ベンチに座る" : "替える";
+  return `『${逃(w.選んだ.題)}』${座る ? "で座る" : "に替える"}`;
+};
+function 選んでいる本を描く(){
+  const w = 本窓;
+  if(!w) return;
+  const 字 = document.getElementById("選んでいる本"), 釦 = document.getElementById("決める釦");
+  if(字) 字.innerHTML = 選んでいる本の字(w);
+  if(釦){ 釦.innerHTML = 決める釦の字(w); 釦.disabled = w.出す && !w.選んだ; }
+}
+
 // 本をさがす欄は、打つたびに候補だけを描き直す（窓ごと描き直すと、打っている字の位置が飛ぶ）
 document.addEventListener("input", e=>{
   if(e.target.id !== "本をさがす" || !本窓) return;
   本窓.探す = e.target.value;
+  // 絞り込んで見えなくなった本は、選んでいない状態に戻す
+  if(本窓.選んだ && !絞った本ら().some(b=>b.id === 本窓.選んだ.id)) 本窓.選んだ = null;
   const 候補 = document.getElementById("本の候補");
-  if(候補) 候補.innerHTML = 本の候補();
+  const 新しい = 本の候補();
+  if(候補 && 本窓.候補の控え !== 新しい){ 候補.innerHTML = 新しい; 本窓.候補の控え = 新しい; }
+  選んでいる本を描く();
 });
 
 document.addEventListener("change", e=>{
@@ -911,7 +942,10 @@ const 動き = {
   題を決める: el=>本で決める(el),
   本を選ぶ: el=>{
     本窓.選んだ = 本窓.本ら.find(b=>b.id === el.dataset.本) || null;
-    本の窓を描く();
+    // 窓ごと描き直さない（欄の文字も、一覧の位置もそのまま）。印と「選んでいる本」だけを直す
+    document.querySelectorAll(".本の候補の札").forEach(b=>b.classList.toggle("いま", b.dataset.本 === 本窓.選んだ?.id));
+    本窓.候補の控え = null;
+    選んでいる本を描く();
   },
   申請をひらく: ()=>{ 本窓.申請 = true; 本の窓を描く(); document.getElementById("申題")?.focus(); },
   申請をとじる: ()=>{ 本窓.申請 = false; 本の窓を描く(); },

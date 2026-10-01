@@ -283,6 +283,10 @@ h2.節見出し{font-size:17px;font-weight:600;letter-spacing:.09em;margin:0}
 .本の候補の札:hover{background:var(--地)}
 .本の候補の札 b{font-family:var(--明朝);font-size:14.5px;font-weight:600}
 .本の候補の札 span{font-family:var(--ゴシック);font-size:11.5px;color:var(--字のごく薄い)}
+/* 「いま読む本」の画面：いま選んでいる本を、釦のすぐ上にいつも出す（取り違えを防ぐ） */
+.選んでいる本{margin:0 0 10px;font-family:var(--ゴシック);font-size:12.5px;color:var(--字の薄い);line-height:1.7}
+.選んでいる本 b{font-family:var(--明朝);font-size:14px;color:var(--字)}
+.決める釦{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .本の候補の札.いま{background:var(--灯の淡い);box-shadow:inset 3px 0 0 var(--灯)}
 
 /* 本の窓：一覧の下の「本の登録を申請する」。見落とされたのでボタンにした（2026-09-30 配信者） */
