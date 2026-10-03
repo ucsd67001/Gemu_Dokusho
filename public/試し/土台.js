@@ -256,6 +256,7 @@ export async function 申請を決める(id, 承認, 直し = {}){
   if(直し.題) b.題 = 直し.題;
   if(直し.著) b.著 = 直し.著;
   if(直し.版元) b.版元 = 直し.版元;
+  if(直し.ページ) b.ページ = 直し.ページ;
   書く(s);
 }
 export async function 読了を読む(){

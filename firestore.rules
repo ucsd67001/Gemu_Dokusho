@@ -60,7 +60,7 @@ service cloud.firestore {
         && shortText(request.resource.data.note, 300)
         && request.resource.data.created == request.time;
       allow update: if isAdmin()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'title', 'author', 'publisher', 'isbn', 'decided'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'title', 'author', 'publisher', 'isbn', 'pages', 'decided'])
         && request.resource.data.status in ['approved', 'rejected']
         && validTitle(request.resource.data.title);
     }

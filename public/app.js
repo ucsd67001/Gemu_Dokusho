@@ -803,6 +803,7 @@ async function 管理の頁(){
       <label class="名札">書籍名</label><input class="欄" id="管題-${逃(b.id)}" maxlength="120" value="${逃(b.題)}">
       <label class="名札">著者名</label><input class="欄" id="管著-${逃(b.id)}" maxlength="80" value="${逃(b.著)}">
       <label class="名札">出版社名</label><input class="欄" id="管版元-${逃(b.id)}" maxlength="80" value="${逃(b.版元)}">
+      <label class="名札">ページ数（わかれば。読了のときに入っておく）</label><input class="欄" id="管ページ-${逃(b.id)}" type="number" inputmode="numeric" min="0" max="20000" value="${b.ページ || ""}">
       ${b.isbn ? `<div class="釦たち" style="margin-top:10px">
         <button class="釦 枠だけ 小" data-する="書誌を引き直す" data-本="${逃(b.id)}" data-isbn="${逃(b.isbn)}">ISBN から書誌を引き直す</button></div>
         <div id="管確認-${逃(b.id)}"></div>` : ""}
@@ -820,7 +821,7 @@ async function 書誌を引き直す(el){
   const r = await ISBNで確かめる(el.dataset.isbn);
   if(!r){ if(確認) 確認.innerHTML = `<p class="注" style="color:var(--誤り)">書誌は見つかりませんでした。</p>`; return; }
   const 入れる = (k, v)=>{ const e = document.getElementById(`${k}-${id}`); if(e && v) e.value = v; };
-  入れる("管題", r.題); 入れる("管著", r.著); 入れる("管版元", r.版元);
+  入れる("管題", r.題); 入れる("管著", r.著); 入れる("管版元", r.版元); if(r.ページ) 入れる("管ページ", String(r.ページ));
   if(確認) 確認.innerHTML = `<p class="注">openBD の書誌を入れました：『${逃(r.題)}』 ${逃(r.著)}／${逃(r.版元)}${r.ページ ? `・${r.ページ}ページ` : ""}</p>`;
 }
 
@@ -829,7 +830,8 @@ async function 申請を決める(el, 承認){
   const 値 = k => document.getElementById(`${k}-${id}`)?.value.trim() || "";
   el.disabled = true;
   try{
-    await 土台.申請を決める(id, 承認, { 題:値("管題"), 著:値("管著"), 版元:値("管版元") });
+    await 土台.申請を決める(id, 承認, { 題:値("管題"), 著:値("管著"), 版元:値("管版元"),
+      ページ:Math.max(0, Math.min(20000, Math.round(Number(値("管ページ")) || 0))) });
     知らせる(承認 ? "本登録にしました" : "見送りました");
     管理の頁();
   }catch(e){

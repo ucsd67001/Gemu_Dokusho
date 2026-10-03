@@ -326,7 +326,7 @@ export async function 申請らを読む(){
 export async function 申請を決める(id, 承認, 直し = {}){
   await updateDoc(doc(db, "books", id), {
     status:承認 ? "approved" : "rejected", decided:serverTimestamp(),
-    ...(直し.題 ? { title:直し.題 } : {}), ...(直し.著 ? { author:直し.著 } : {}), ...(直し.版元 ? { publisher:直し.版元 } : {}),
+    ...(直し.題 ? { title:直し.題 } : {}), ...(直し.著 ? { author:直し.著 } : {}), ...(直し.版元 ? { publisher:直し.版元 } : {}), ...(直し.ページ ? { pages:直し.ページ } : {}),
   });
 }
 
