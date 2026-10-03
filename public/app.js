@@ -380,6 +380,12 @@ function 部屋の頁(){
       窓を閉じる();
       知らせる("ほかの端末で読み終えたので、この端末でも席を立ちました");
     }
+    if(出来事 === "長く離れて立った"){
+      窓を閉じる();
+      知らせる("画面を消してから12時間を過ぎたので、席を立ちました。この回は記録に残りません", true);
+    }
+    // 席を合わせたあと（開き直したときなど）も、長く離れていたかを確かめる
+    if(土台.座っている()) 戻りを確かめる({ 聞くだけ:true });
     if(土台.座っている()) return;
     if(初めて){
       初めて = false;
@@ -404,7 +410,7 @@ function 部屋の頁(){
     }
   }, 3500);
   // 1分ごとに「まだいます」を送る。読んだ時間の表示も直す
-  const 生きる = setInterval(()=>{ 土台.生きている().catch(()=>{}); }, 60000);
+  const 生きる = setInterval(()=>戻りを確かめる(), 60000);
   const 時計 = setInterval(手もとを描く, 30000);
   片づけ.push(()=>{ clearInterval(めくり); clearInterval(生きる); clearInterval(時計); });
 
@@ -412,7 +418,52 @@ function 部屋の頁(){
 
 const 満席か = () => 状態.席ら.length >= (部屋ら[状態.部屋]?.席.length || 0);
 const 元の題名 = document.title;
-addEventListener("visibilitychange", ()=>{ if(!document.hidden) document.title = 元の題名; });
+addEventListener("visibilitychange", ()=>{
+  if(document.hidden) return;
+  document.title = 元の題名;
+  if(状態.頁 === "部屋") 戻りを確かめる();
+});
+
+/* ⚠️⚠️ 画面を消して読む人（2026-10-04 配信者）。
+   席は12時間保つ。**3時間以上**たってから（2026-10-04 配信者「30分以上 ⇒ 3時間以上」）戻ったら「読み続けていましたか？」と聞き、読んだ時間を **時間：分** で自己申告してもらう
+   （配信者「ずっと読み続けていないと思うので、時間：分を手入力で」）。申告より後ろの時間は休みとして記録から引く（土台.js の 離席を記録）。
+   答えるまでは「生きている」を送らない（送ると、離れていた時間が消える） */
+function 戻りを確かめる({ 聞くだけ = false } = {}){
+  if(!土台.座っている()) return;
+  if(document.getElementById("戻りの時")) return;   // もう聞いている
+  const 離れ = 土台.離れていた時間();
+  // 12時間を過ぎていたら、席は空いている。ここで答えさせると席が生き返るので、記録せずに立つ
+  if(離れ >= 土台.席を保つ){
+    窓を閉じる();
+    土台.立つ().catch(()=>{});
+    知らせる("画面を消してから12時間を過ぎたので、席を立ちました。この回は記録に残りません", true);
+    部屋を描き直す();
+    return;
+  }
+  if(離れ >= 土台.聞く離れ) return 戻りの窓(離れ);
+  if(!聞くだけ) 土台.生きている().catch(()=>{});   // 席の様子が届くたびに送ると、送る→届く→送る…と回り続ける
+}
+
+function 戻りの窓(離れ){
+  窓を出す("おかえりなさい", `
+    <p class="窓の文">画面を消してから <b>${分に(離れ)}</b> たちました。<br>そのあいだ、読み続けていましたか？</p>
+    <p class="注">読んでいた時間を入れてください。ここで入れた時間だけが、記録に残ります。</p>
+    <div class="戻りの時" id="戻りの時" data-離れ="${離れ}">
+      <input class="欄" id="戻りの時間" type="number" inputmode="numeric" min="0" max="12" placeholder="0" aria-label="時間"><span>時間</span>
+      <input class="欄" id="戻りの分" type="number" inputmode="numeric" min="0" max="59" placeholder="0" aria-label="分"><span>分</span>
+    </div>
+    <div class="窓の釦">
+      <button class="釦 全幅" data-する="戻りを記録">この時間、読んでいました</button>
+      <button class="釦 枠だけ 全幅" data-する="戻りを記録しない">読んでいませんでした</button>
+    </div>`);
+}
+
+function 戻りを記録(読んだ分){
+  土台.離席を記録(読んだ分);
+  窓を閉じる();
+  土台.生きている().catch(()=>{});
+  手もとを描く();
+}
 
 const 置き = (席, 幅) => `left:${席.x}%;top:${席.y}%${幅 ? `;width:${席.幅}%` : ""}`;
 
@@ -518,7 +569,7 @@ function 手もとを描く(){
   el.innerHTML = `<div class="手もと">
     ${顔の絵(状態.自分, "中")}
     <div class="何を"><div class="書名">${題 ? `『${逃(題)}』` : "書籍名は出していません"}</div>
-      <div class="時">読みはじめて ${分に(Date.now() - 席.入った)}</div></div>
+      <div class="時">読んだ時間 ${分に(土台.読んだ時間())}</div></div>
     <div class="釦たち">
       <button class="釦 枠だけ 小" data-する="本を替える">本を替える</button>
       <button class="釦 小" data-する="読み終える">読み終える</button>
@@ -1021,6 +1072,16 @@ const 動き = {
   読み終える: ()=>読み終える窓(),
   // ⚠️ 2026-09-27 に行の範囲で消したとき、これまで消えていた（「投稿しないで終える」が効かなかった）
   そのまま終える: ()=>終える(),
+  戻りを記録: ()=>{
+    const 時 = Number(document.getElementById("戻りの時間")?.value || 0);
+    const 分 = Number(document.getElementById("戻りの分")?.value || 0);
+    if(!Number.isFinite(時) || !Number.isFinite(分) || 時 < 0 || 分 < 0) return 知らせる("時間と分を、0以上の数で入れてください", true);
+    if(時 === 0 && 分 === 0) return 知らせる("読んでいた時間を入れてください（読んでいなければ「読んでいませんでした」）", true);
+    const 離れ = Number(document.getElementById("戻りの時")?.dataset.離れ || 0);
+    // 離れていた時間より長くは読めない
+    戻りを記録(Math.min(時 * 60 + 分, Math.ceil(離れ / 60000)));
+  },
+  戻りを記録しない: ()=>戻りを記録(0),
   投稿して終える: async el=>{
     el.disabled = true;
     el.textContent = "投稿の準備をしています…";
@@ -1062,9 +1123,10 @@ let 読み終えの絵 = null, 読み終えの中身 = null;
 function 読み終える窓(){
   const 席 = 土台.座っている();
   if(!席) return 終える();
+  if(土台.離れていた時間() >= 土台.聞く離れ) return 戻りの窓(土台.離れていた時間());
   const 題 = 状態.席ら.find(s=>s.uid === 状態.私.uid)?.題 ?? "";
   const 本 = 席.区切り?.at(-1)?.本 || "";
-  const 分 = Math.max(1, Math.round((Date.now() - 席.入った) / 60000));
+  const 分 = Math.max(1, Math.round(土台.読んだ時間() / 60000));
   const 場所 = 部屋ら[状態.部屋].名;
   読み終えの絵 = null;
   読み終えの中身 = { 題, 本, 分, 場所 };

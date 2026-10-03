@@ -81,7 +81,8 @@ service cloud.firestore {
        ⚠️ seen（最後に生きていた時刻）が3分より古い席は、空いているとみなす。
           タブを閉じると「立つ」が届かないことがあるため。空いた席には誰でも座れる。 */
     match /rooms/{room}/seats/{seat} {
-      function stale() { return resource.data.seen < request.time - duration.value(3, 'm'); }
+      // 12時間（画面を消して読む人のため。2026-10-04。土台.js の 古いとみなす とそろえる）
+      function stale() { return resource.data.seen < request.time - duration.value(12, 'h'); }
       function shape() {
         return request.resource.data.keys().hasOnly(['uid', 'title', 'since', 'seen', 'book'])   // book＝本の id（別の端末が本を引き継ぐため）
           && request.resource.data.uid == request.auth.uid
