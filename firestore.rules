@@ -92,7 +92,7 @@ service cloud.firestore {
       }
       allow read: if signedIn();
       // ⚠️ 場所を増やしたら、ここにも足す（public/部屋.js の id と同じ名前）
-      allow create: if signedIn() && room in ['rothenburg', 'cafe']
+      allow create: if signedIn() && room in ['rothenburg', 'owakudani', 'cafe']
         && seat in ['0', '1', '2', '3', '4', '5', '6', '7'] && shape();   // 8人まで（ローテンブルク）
       allow update: if signedIn() && shape() && (resource.data.uid == request.auth.uid || stale());
       allow delete: if signedIn() && (resource.data.uid == request.auth.uid || stale());

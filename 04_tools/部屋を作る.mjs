@@ -3,6 +3,7 @@
 
    使い方（リポジトリの一番上で）：
      node 04_tools/部屋を作る.mjs rothenburg      … ローテンブルクを2枚
+     node 04_tools/部屋を作る.mjs owakudani       … 箱根・大涌谷を2枚
      node 04_tools/部屋を作る.mjs cafe 4          … カフェを4枚
      node 04_tools/部屋を作る.mjs bench           … 空いた席に置く空のベンチ（前向き・後ろ向きの2枚。背景は透明）
        → 気に入ったら public/部屋/bench_front.webp と bench_back.webp にする
@@ -49,6 +50,20 @@ const 指示ら = {
     "Bright sunny morning light, blue-sky daylight feeling.",
     "In the front there is a small open cobblestone plaza.",
     "IMPORTANT: leave four clear, empty spots on the cobblestones of the front plaza (left-back, right-back, left-front, right-front)",
+    "where seated characters on benches will be added later. There are NO benches, NO chairs, NO stools at those spots.",
+    ...共通,
+  ],
+  /* 箱根・大涌谷（2026-10-03 配信者）。湯けむりの立つ岩の谷と、とがった山。看板は文字なし */
+  owakudani: [
+    "Isometric diorama of a small piece of Owakudani volcanic valley in Hakone, Japan, viewed from above at a 3/4 angle,",
+    "a square cut-out block of the landscape floating on a plain background.",
+    "Rocky pale yellow-gray volcanic slopes with several white steam vents and soft clouds of sulfur steam rising,",
+    "a jagged mountain peak with dry brown and green bushes behind, a calm blue sky with soft white clouds feeling.",
+    "A walking path paved with flat stones and a few stone steps, lined with low wooden posts connected by rope,",
+    "a small wooden signboard frame WITHOUT any letters, a few large rounded boulders.",
+    "Bright, clear daytime, peaceful and fresh mountain air.",
+    "In the front there is a flat open stone-paved viewing terrace.",
+    "IMPORTANT: leave four clear, empty spots on the front terrace (left-back, right-back, left-front, right-front)",
     "where seated characters on benches will be added later. There are NO benches, NO chairs, NO stools at those spots.",
     ...共通,
   ],
