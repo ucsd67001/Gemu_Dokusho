@@ -535,6 +535,8 @@ function 手もとを描く(){
    ⚠️ 前は題を自由に打ち込んでいた。同じ本が表記ゆれで別の本になるのを防ぐため、登録済みから選ぶ形にした */
 let 本窓 = null;   // { やること, 出す, 本ら, 選んだ, 探す, 申請, 送信中 }
 const 前の本 = () =>{ try{ return localStorage.getItem("gemuの前の本") || ""; }catch{ return ""; } };
+// 読了した本は、次の「いま読む本」の画面で選んだ状態にしない
+const 前の本を忘れる = () =>{ try{ localStorage.removeItem("gemuの前の本"); }catch{} };
 const 本の見出し = b => [b.著, b.版元].filter(Boolean).join("／") + (b.状態 === "仮登録" ? "（仮登録）" : "");
 
 async function 題の窓(やること){
@@ -546,7 +548,11 @@ async function 題の窓(やること){
   // ⚠️ 読み終える前に窓が閉じられた（先に座った・✕を押した）なら、何もしない
   if(本窓 !== w) return;
   w.本ら = 本ら;
-  w.選んだ = 本ら.find(b=>b.id === 前の本()) || null;
+  /* 前回の本を選んだ状態で開く。ただし**読了した本は選ばない**
+     （2026-10-03 配信者「前回読み終えた本が、読み始めるときに続きを読むように出てくる」） */
+  const 読了した = new Set((await 土台.読了を読む().catch(()=>[])).map(r=>r.本).filter(Boolean));
+  if(本窓 !== w) return;
+  w.選んだ = 読了した.has(前の本()) ? null : (本ら.find(b=>b.id === 前の本()) || null);
   本の窓を描く();
 }
 
@@ -579,7 +585,7 @@ function 本の窓を描く(){
       <input id="申amazon" class="欄" placeholder="https://www.amazon.co.jp/…/dp/4166612476">
       <button class="釦 枠だけ 小" data-する="Amazonから読む">読み取る</button>
     </div>
-    <p class="注">紙の本の URL なら、書籍名・著者名・出版社名を自動で入れます。短縮リンク（amzn.to/… など）は、一度開いて出てきた URL を貼ってください。<b>リンク自体は保存しません。</b></p>
+    <p class="注">紙の本の URL なら、書籍名・著者名・出版社名を自動で入れます。短縮リンク（amzn.asia/… など）も使えます。<b>リンク自体は保存しません。</b></p>
     <label class="名札" for="申isbn">ISBN（わかれば。あると確実です）</label>
     <div class="欄と釦">
       <input id="申isbn" class="欄" maxlength="20" inputmode="numeric" placeholder="9784166612475">
@@ -973,8 +979,18 @@ const 動き = {
     }
   },
   Amazonから読む: async ()=>{
-    const u = document.getElementById("申amazon")?.value.trim() || "";
-    if(/link\.amazon|amzn\.to|amzn\.asia/.test(u)) return 知らせる("短縮リンクは辿れません。一度開いて、出てきた URL を貼ってください", true);
+    let u = document.getElementById("申amazon")?.value.trim() || "";
+    // 短縮リンク（amzn.asia など）は、画面からは辿れないので裏の処理に辿ってもらう（2026-10-03 配信者）
+    if(/^https?:\/\/(amzn\.asia|amzn\.to|a\.co|amzn\.com|link\.amazon)/i.test(u)){
+      const 確認 = document.getElementById("申請の確認");
+      if(確認) 確認.innerHTML = `<p class="注">短縮リンクを辿っています…</p>`;
+      const 先 = await 土台.短縮リンクを辿る(u);
+      if(!先){
+        if(確認) 確認.innerHTML = "";
+        return 知らせる("短縮リンクを辿れませんでした。一度開いて、出てきた URL を貼ってください", true);
+      }
+      u = 先;
+    }
     const asin = AmazonのASIN(u);
     if(!asin) return 知らせる("Amazon の URL から商品番号を読み取れませんでした", true);
     const isbn = ISBN13にする(asin);
@@ -1013,7 +1029,9 @@ const 動き = {
     /* 文・ハッシュタグ・リンクのあいだに空の行を1つずつ（2026-09-29 配信者）。
        ⚠️ リンクは url= で渡さず、文に入れる。url= だと X が文のすぐ後ろ（同じ行）につなげる */
     const 先 = "https://x.com/intent/post?text=" + encodeURIComponent(`${文}\n\n#GEMuの静かな読書会\n\n${行き先}`);
-    await 土台.立つ({ 記録する:true, 読了:読了を読む() }).catch(()=>{});
+    const 読了 = 読了を読む();
+    if(読了) 前の本を忘れる();
+    await 土台.立つ({ 記録する:true, 読了 }).catch(()=>{});
     /* スマホ：このページのまま X へ移る（X のアプリが入っていれば、アプリが開く）。
        ⚠️ 絵を置き終わってから新しい窓を開くと、スマホでは止められて、X が立ち上がらなかった（2026-09-27 配信者） */
     if(スマホ){ location.href = 先; return; }
@@ -1083,6 +1101,7 @@ function 読了を読む(){
 
 async function 終える(){
   const 読了 = 読了を読む();
+  if(読了) 前の本を忘れる();
   窓を閉じる();
   await 土台.立つ({ 記録する:true, 読了 }).catch(()=>{});
   行く("廊下");

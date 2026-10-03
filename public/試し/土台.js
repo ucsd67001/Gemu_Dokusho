@@ -206,7 +206,7 @@ export async function 立つ({ 記録する = false, 読了 = null } = {}){
   if(!いま) return;
   if(!記録する){ いま = null; return; }   // 席を消すのは「読み終える」のときだけ（土台.js と同じ）
   const s = 読む();
-  if(記録する && 読了) (s.読了 ||= []).push({ uid:私.uid, 題:読了.題, ページ:読了.ページ, いつ:Date.now() });
+  if(記録する && 読了) (s.読了 ||= []).push({ uid:私.uid, 題:読了.題, 本:読了.本 || "", ページ:読了.ページ, いつ:Date.now() });
   if(記録する){
     const 終わり = Date.now();
     いま.区切り.forEach((k, i)=>{
@@ -259,8 +259,10 @@ export async function 申請を決める(id, 承認, 直し = {}){
   書く(s);
 }
 export async function 読了を読む(){
-  return (読む().読了 || []).filter(x=>x.uid === 私.uid).map(({ 題, ページ, いつ })=>({ 題, ページ, いつ }));
+  return (読む().読了 || []).filter(x=>x.uid === 私.uid).map(({ 題, 本, ページ, いつ })=>({ 題, 本:本 || "", ページ, いつ }));
 }
+// 試しには裏の処理が無いので、短縮リンクは辿れない
+export async function 短縮リンクを辿る(){ return null; }
 // 試しでは、この端末の中の記録から数える（架空の仲間にも少し数を持たせる）
 export async function 読み方を読む(){
   const s = 読む();

@@ -335,7 +335,13 @@ export async function 申請を決める(id, 承認, 直し = {}){
 
 export async function 読了を読む(){
   const s = await getDocs(query(collection(db, "finishes"), where("uid", "==", 私.uid)));
-  return s.docs.map(d=>{ const x = d.data(); return { 題:x.title, ページ:x.pages || 0, いつ:x.at?.toMillis?.() || 0 }; });
+  return s.docs.map(d=>{ const x = d.data(); return { 題:x.title, 本:x.book || "", ページ:x.pages || 0, いつ:x.at?.toMillis?.() || 0 }; });
+}
+
+// Amazon の短縮リンク（amzn.asia など）の飛び先を、裏の処理に辿ってもらう。商品のリンク（…/dp/…）か null
+export async function 短縮リンクを辿る(url){
+  try{ return (await httpsCallable(呼ぶ, "resolveAmazonLink", { timeout: 20000 })({ url })).data?.url || null; }
+  catch(e){ console.error(e); return null; }
 }
 
 // 読み方は、人それぞれ：冊数・ページ数・時間の、それぞれ上位3人（functions の readerStats が数える）

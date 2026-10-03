@@ -226,7 +226,10 @@ FUNCTIONS_DISCOVERY_TIMEOUT=60000 firebase deploy --project gemu-dokusho --only 
 - 申請は書名・著者名・出版社名が必須、ISBN とひとことは任意
 - **本の登録・管理は Hongaeshi を下敷きにする**（2026-09-30 配信者「使いまわせる部分は Hongaeshi を参考に」）：
   - **Amazon の URL から書誌を読み取る**：紙の本の ASIN は ISBN-10 と同じなので、ISBN-13 に直して openBD で引く（`public/書誌.js`）。
-    Kindle 版（B0…）と短縮リンクは引けない。**リンクは保存しない**
+    Kindle 版（B0…）は引けない。**リンクは保存しない**
+  - **短縮リンク**（amzn.asia／amzn.to／a.co など）は、画面からは辿れない（CORS）ので、functions の `resolveAmazonLink` が辿る
+    （2026-10-03 配信者）。⚠️ 辿るのは Amazon の短縮リンクだけ、返すのも Amazon の商品のリンクだけ（どこへでも取りに行ける入口にしない）。
+    HEAD は 404 になるので GET で、飛び先（Location）だけを見る
   - **ISBN を確かめる**：同じく openBD。ページ数が載っていれば受け取り、読了のときに入れておく
   - 本の窓の「**＋ 本の登録を申請する**」はボタンにして目立たせる（2026-09-30。見落とされた。⚠️ さがす欄に URL を貼る形は作ったが、配信者の希望で外した）
   - 著者欄は **`public/名寄せ.js`（Hongaeshi の写し）**の規則で「山形浩生」の形にする。⚠️ 規則を直すときは Hongaeshi の側を直して写し直す
@@ -238,6 +241,7 @@ FUNCTIONS_DISCOVERY_TIMEOUT=60000 firebase deploy --project gemu-dokusho --only 
   iPhone では日本語を確定するひと押しで候補が描き直され、押した候補が選ばれなかった。
   → いま選んでいる本を**ボタンのすぐ上とボタンの字**（「『推し、燃ゆ』で座る」）にいつも出す／
     絞り込んで見えなくなった本は選んでいない状態に戻す／候補の中身が変わらないときは描き直さない
+- 「いま読む本」の画面は前回の本を選んだ状態で開くが、**読了した本は選ばない**（2026-10-03 配信者「読み終えた本が、続きを読むように出てくる」）
 
 ### Hongaeshi の本棚を写す（2026-09-29 配信者）
 `node 04_tools/Hongaeshiから写す.mjs` → `public/本棚.json`（書誌だけ。93冊）→ hosting を上げる。

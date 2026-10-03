@@ -13,6 +13,7 @@
                    （向きを記録する前に作ったアバターのため。画面が一度だけ呼ぶ）
      borrowImages  アバターの絵を data URL で返す（読み終えたときの X 用の絵を、画面の canvas で描くため）
      sharePage     読書の記録ページ /s/{id}。X がリンクから絵（og:image）を読み取って、投稿に大きく出す
+     resolveAmazonLink  Amazon の短縮リンク（amzn.asia など）の飛び先を辿って、商品のリンクを返す（本の申請の入力補助）
      readerStats   「読み方は、人それぞれ」：読了した冊数・読了した本の総ページ数・読んだ時間の、それぞれ上位3人。
                    あわせて「本のランキング」：本ごとの読了の数・読まれたページの数・読まれた時間の、それぞれ上位3冊
 
@@ -328,6 +329,29 @@ main{width:min(1080px,100% - 32px);margin:40px auto}img{width:100%;border:1px so
 p{margin:18px 0 0}a{color:#513397}</style></head>
 <body><main><img src="${逃(d.image)}" alt="${逃(題)}"><p>${逃(題)}</p>
 <p><a href="/">GEMuの静かな読書会</a> ― 家にいながら、景色のいい場所で読む。</p></main></body></html>`);
+});
+
+/* ── Amazon の短縮リンクを辿る ─────────────────────
+   2026-10-03 配信者「https://amzn.asia/d/… だと検索できない」。短縮リンクはブラウザからは辿れない（CORS）ので、ここで辿る。
+   ⚠️ **辿るのは Amazon の短縮リンクだけ**（どこへでも取りに行ける入口にしない）。飛び先も Amazon のときだけ返す。
+   ⚠️ HEAD だと 404 が返る。GET で、飛び先（Location）だけを見る。中身は読まない。**リンクは保存しない** */
+const 短縮の家 = /^(amzn\.asia|amzn\.to|a\.co|amzn\.com|link\.amazon(\.[a-z.]+)?)$/i;
+const Amazonの家 = /^(www\.)?amazon\.(co\.jp|com|jp)$/i;
+export const resolveAmazonLink = onCall({ region: "asia-northeast1", timeoutSeconds: 20 }, async req => {
+  if(!req.auth) throw new HttpsError("unauthenticated", "ログインしてください");
+  let u;
+  try{ u = new URL(String(req.data?.url || "")); }catch{ throw new HttpsError("invalid-argument", "URL が読めません"); }
+  if(u.protocol !== "https:" || !短縮の家.test(u.hostname)) throw new HttpsError("invalid-argument", "Amazon の短縮リンクではありません");
+  for(let 回 = 0; 回 < 4; 回++){
+    const r = await fetch(u, { method: "GET", redirect: "manual",
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; GEMu-dokusho/1.0)" } });
+    const 先 = r.headers.get("location");
+    if(!先) break;
+    u = new URL(先, u);
+    if(Amazonの家.test(u.hostname)) return { url: u.origin + u.pathname };
+    if(!短縮の家.test(u.hostname)) break;
+  }
+  throw new HttpsError("not-found", "短縮リンクの飛び先が見つかりませんでした");
 });
 
 /* ── 読み方は、人それぞれ ─────────────────────────
