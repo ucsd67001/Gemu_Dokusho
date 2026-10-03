@@ -287,7 +287,8 @@ const 状態の名 = { pending:"仮登録", approved:"本登録", rejected:"見�
 function 本に(d){
   const x = d.data() || {};
   return { id:d.id, 題:x.title || "", 著:x.author || "", 版元:x.publisher || "", isbn:x.isbn || "",
-    ひとこと:x.note || "", ページ:x.pages || 0, 状態:状態の名[x.status] || x.status, 申請者:x.requestedBy || "" };
+    ひとこと:x.note || "", ページ:x.pages || 0, 状態:状態の名[x.status] || x.status, 申請者:x.requestedBy || "",
+    申請日:x.created?.toMillis?.() || 0 };
 }
 
 /* Hongaeshi から写した本棚（public/本棚.json。04_tools/Hongaeshiから写す.mjs で作る）。
@@ -320,7 +321,7 @@ export async function 管理者か(){
 }
 export async function 申請らを読む(){
   const s = await getDocs(query(collection(db, "books"), where("status", "==", "pending")));
-  return s.docs.map(本に);
+  return s.docs.map(本に).sort((a, b)=>a.申請日 - b.申請日);   // 古い申請から
 }
 // 承認（本登録）か見送り。承認のときは、題・著者・出版社を直してから本登録にできる
 export async function 申請を決める(id, 承認, 直し = {}){

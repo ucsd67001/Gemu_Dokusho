@@ -223,7 +223,7 @@ export const 座っている = () => いま ? { ...いま } : null;
 export const 題を出さない印 = "（題を出さずに読んだ本）";
 // 本（土台.js と同じ形）。試しの人は管理者でもある（管理の頁を試すため）
 const 本ら = s => Object.entries(s.本 ||= {}).map(([id, x])=>({ id, 題:x.題, 著:x.著, 版元:x.版元 || "",
-  isbn:x.isbn || "", ひとこと:x.ひとこと || "", ページ:x.ページ || 0, 状態:x.状態, 申請者:x.申請者 || "" }));
+  isbn:x.isbn || "", ひとこと:x.ひとこと || "", ページ:x.ページ || 0, 状態:x.状態, 申請者:x.申請者 || "", 申請日:x.申請日 || 0 }));
 
 /* Hongaeshi から写した本棚（public/本棚.json。04_tools/Hongaeshiから写す.mjs で作る）。
    **本登録の本**として一覧に混ぜる（2026-09-29 配信者「Hongaeshi の図書データをコピーして」）。
@@ -242,12 +242,12 @@ export async function 本らを読む(){
 export async function 本を申請する({ 題, 著, 版元, isbn, ひとこと, ページ = 0 }){
   const s = 読む();
   const id = "b" + Math.random().toString(36).slice(2, 8);
-  (s.本 ||= {})[id] = { 題, 著, 版元, isbn, ひとこと, ページ, 状態:"仮登録", 申請者:私.uid };
+  (s.本 ||= {})[id] = { 題, 著, 版元, isbn, ひとこと, ページ, 状態:"仮登録", 申請者:私.uid, 申請日:Date.now() };
   書く(s);
   return { id, 題, 著, 版元, isbn, ひとこと, ページ, 状態:"仮登録", 申請者:私.uid };
 }
 export async function 管理者か(){ return true; }
-export async function 申請らを読む(){ return 本ら(読む()).filter(b=>b.状態 === "仮登録"); }
+export async function 申請らを読む(){ return 本ら(読む()).filter(b=>b.状態 === "仮登録").sort((a, b)=>a.申請日 - b.申請日); }
 export async function 申請を決める(id, 承認, 直し = {}){
   const s = 読む();
   const b = s.本?.[id];

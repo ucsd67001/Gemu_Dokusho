@@ -778,6 +778,10 @@ async function 記録の頁(){
     </section>`;
 }
 
+// 「10月3日 21:33」の形（申請の日時など）
+const 日時に = t =>{ const d = new Date(t);
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+
 /* ── 管理（本の申請を承認する） ───────────────────
    管理者（Firebase コンソールで admins/{uid} を足した人）だけに出る（2026-09-29 配信者）。
    承認すると本登録（みんなが選べる）。見送ると、申請した本人の一覧からも消える。
@@ -799,7 +803,7 @@ async function 管理の頁(){
   列.innerHTML = `<div class="申請の列">${申請ら.map(b=>`
     <div class="申請">
       <div class="申請の素性">申請：${逃(状態.人々.get(b.申請者)?.名 || "（ユーザ名なし）")}
-        ${b.isbn ? `／ISBN ${逃(b.isbn)}` : ""}${b.ひとこと ? `／「${逃(b.ひとこと)}」` : ""}</div>
+        ${b.申請日 ? `／${日時に(b.申請日)}` : ""}${b.isbn ? `／ISBN ${逃(b.isbn)}` : ""}${b.ひとこと ? `／「${逃(b.ひとこと)}」` : ""}</div>
       <label class="名札">書籍名</label><input class="欄" id="管題-${逃(b.id)}" maxlength="120" value="${逃(b.題)}">
       <label class="名札">著者名</label><input class="欄" id="管著-${逃(b.id)}" maxlength="80" value="${逃(b.著)}">
       <label class="名札">出版社名</label><input class="欄" id="管版元-${逃(b.id)}" maxlength="80" value="${逃(b.版元)}">
