@@ -1,8 +1,15 @@
 /* ============================================================
    GEMuの静かな読書会 ― 画面
 
-   流れ：入口（Googleで入る）→ 名前と写真 → アバターができるのを待つ → できあがり
-         → 廊下（場所の一覧）→ 場所のベンチに座る（読む本の題を入れる）
+   流れ：入口（Google でログイン）→ ユーザ名と写真 → アバターができるのを待つ → できあがり
+         → 廊下（場所の一覧）→ 場所のベンチに座る（本棚から読む本を選ぶ）
+
+   ⚠️ 画面に出す言葉は README の「用語集」の左の列だけ（書籍名・ユーザ名・アバター・場所 など）。
+      書き方の決まり（2026-10-04 にそろえた）：
+      ・時間は 時間に()／分に() で「2時間5分」の形（60分未満は「45分」）。X の投稿文と絵も同じ
+      ・「だれ」はひらがな。注（小さな字の文）は句点で終える
+      ・待っているあいだの積み木（待ちの画面）は「…」を付けない。押したボタンの字と、欄の下の途中経過は「…」を付ける
+      ・うまくいかなかったときの字は 誤りの字。知らせる() の文は「何が」できなかったかを書く
    ⚠️ 画面の中の名前は「部屋」のまま（コードの名前）。利用者に見せる言葉は「場所」。
       2026-09-27 に、神保町のカフェから「世界の、読書が気持ちよさそうな観光地」へ変えた（最初はローテンブルク）
 
@@ -70,11 +77,9 @@ function 絵を入れる(根の要素 = document){
 const 顔の絵 = (人, 大きさ = "") =>
   `<img class="顔 ${大きさ}" data-道="${逃(人?.アバター?.顔 || "")}" alt="">`;
 
-function 分に(ms){
-  const 分 = Math.max(0, Math.round(ms / 60000));
-  if(分 < 60) return `${分}分`;
-  return `${Math.floor(分 / 60)}時間${分 % 60 ? (分 % 60) + "分" : ""}`;
-}
+// 時間の書き方（2026-10-04 にそろえた）：「45分」「2時間」「2時間5分」。X の投稿文と絵も同じ
+const 時間に = 分 => 分 < 60 ? `${分}分` : `${Math.floor(分 / 60)}時間${分 % 60 ? (分 % 60) + "分" : ""}`;
+const 分に = ms => 時間に(Math.max(0, Math.round(ms / 60000)));
 
 /* ── 頁の行き来 ─────────────────────────── */
 const 道の頁 = { "":"廊下", "/log":"記録", "/me":"自分", "/admin":"管理" };
@@ -103,7 +108,7 @@ addEventListener("popstate", ()=>{
   行く(頁, false);
 });
 // タブを閉じるとき：この端末が座っているつもりをやめるだけ。席は消さない（ほかの端末で読んでいるかもしれない。
-// どこも読んでいなければ3分で空く）
+// どこも読んでいなければ12時間で空く）
 addEventListener("pagehide", ()=>{ 土台.立つ().catch(()=>{}); });
 
 /* ── 描く ─────────────────────────────── */
@@ -146,7 +151,7 @@ function 帯を描く(){
   // 顔と名前を1つのボタンに（Hongaeshi の「わたし」と同じ形。2026-09-27 配信者）
   if(入った) 右.innerHTML = `<button class="わたし ${状態.頁 === "自分" ? "いま" : ""}" data-する="行く" data-頁="自分" title="自分のページ">
       ${顔の絵(状態.自分)}<span class="名">${逃(状態.自分.名)}</span></button>`;
-  else if(状態.起きた && !状態.私) 右.innerHTML = `<button class="釦 小" data-する="入る">${試しか ? "試しに入る" : "Google で入る"}</button>`;
+  else if(状態.起きた && !状態.私) 右.innerHTML = `<button class="釦 小" data-する="入る">${試しか ? "試しに入る" : "Google でログイン"}</button>`;
   else 右.innerHTML = "";
   絵を入れる(右);
   document.querySelector(".試用札").hidden = !試しか;
@@ -163,14 +168,14 @@ function 入口(){
   <section class="幕">
     <p class="英字の札">GEMu Dokusho</p>
     <h1 class="大見出し">家にいながら、<br>景色のいい場所で読む。</h1>
-    <p class="導き">誰にも邪魔されずに、ひとりで静かに本を読むのが好き。でも、景色のいいところで読むのにも、ちょっと憧れている。インドア派だから、なかなか行けないけれど。</p>
-    <p class="導き" style="margin-top:10px">ここでは、自分の姿をブロックにして、世界の、読書が気持ちよさそうな場所のベンチに座ります。話さなくていい。となりのベンチでも、だれかが自分の本を読んでいます。最初の場所は、ドイツのローテンブルクです。</p>
+    <p class="導き">だれにも邪魔されずに、ひとりで静かに本を読むのが好き。でも、景色のいいところで読むのにも、ちょっと憧れている。インドア派だから、なかなか行けないけれど。</p>
+    <p class="導き" style="margin-top:10px">ここでは、自分をブロックのアバターにして、世界の、読書が気持ちよさそうな場所のベンチに座ります。話さなくていい。となりのベンチでも、だれかが自分の本を読んでいます。最初の場所は、ドイツのローテンブルクです。</p>
     <div class="釦たち" style="margin-top:30px">
-      <button class="釦" data-する="入る">${試しか ? "試しに入る" : "Google で入る"}</button>
+      <button class="釦" data-する="入る">${試しか ? "試しに入る" : "Google でログイン"}</button>
     </div>
     <p class="注">${試しか
       ? "これは試しです。この端末のブラウザの中だけで動きます。タブを2つ開くと、2人で入れます。"
-      : "はじめて入るときに、ユーザ名と写真を決めます。"}</p>
+      : "はじめてログインするときに、ユーザ名と写真を決めます。"}</p>
   </section>`;
 }
 
@@ -184,7 +189,7 @@ function 写真の欄(){
       ${選んだ写真 ? `<img class="写真の見本" src="${選んだ写真}" alt="">` : `<div class="写真の見本">まだです</div>`}
       <div>
         <label class="釦 枠だけ 小">写真を選ぶ<input type="file" accept="image/*" data-する="写真"></label>
-        <p class="注" style="margin-top:8px">自分の写真でも、好きなキャラクターの絵でも。写っているものを、そのままブロックの姿にします。</p>
+        <p class="注" style="margin-top:8px">自分の写真でも、好きなキャラクターの絵でも。写っているものを、そのままブロックのアバターにします。</p>
       </div>
     </div>
     <p class="注">写真は、アバターを作るために OpenAI へ送るだけで、保存しません。残るのは、できあがったブロックの絵だけです。</p>`;
@@ -196,7 +201,7 @@ function 登録(){
   <section class="幕 帳">
     <p class="英字の札">Welcome</p>
     <h1 class="中見出し">はじめまして</h1>
-    <p class="導き">ユーザ名と写真を決めると、写真をもとに、ブロックの姿のアバターを作ります。</p>
+    <p class="導き">ユーザ名と写真を決めると、写真をもとに、ブロックのアバターを作ります。</p>
     <label class="名札" for="名の欄">ユーザ名（アバターの足もとに出ます）</label>
     <input id="名の欄" class="欄" maxlength="20" placeholder="例：しおり" value="${逃(状態.自分?.名 || "")}">
     ${写真の欄()}
@@ -228,7 +233,7 @@ function できあがり(){
     ${三枚(a)}
     <div class="釦たち" style="margin-top:30px">
       <button class="釦" data-する="場所へ" data-部屋="${最初の部屋}">${逃(部屋ら[最初の部屋].名)}へ</button>
-      <button class="釦 枠だけ" data-する="行く" data-頁="自分">作り直す</button>
+      <button class="釦 枠だけ" data-する="行く" data-頁="自分">自分のページで作り直す</button>
     </div>
   </section>`;
   状態.作ったばかり = false;
@@ -236,11 +241,11 @@ function できあがり(){
 }
 
 const 三枚 = a => `<div class="三枚">
-  <figure><img data-道="${逃(a.座る)}" alt="座って読む姿"><figcaption>座って読む（奥の席）</figcaption></figure>
-  <figure><img data-道="${逃(a.めくる)}" alt="ページをめくる姿"><figcaption>ページをめくる</figcaption></figure>
-  <figure>${a.背中 ? `<img data-道="${逃(a.背中)}" alt="後ろから見た姿">` : `<div class="まだ">まだありません</div>`}
+  <figure><img data-道="${逃(a.座る)}" alt="座って読むアバター"><figcaption>座って読む（奥の席）</figcaption></figure>
+  <figure><img data-道="${逃(a.めくる)}" alt="ページをめくるアバター"><figcaption>ページをめくる</figcaption></figure>
+  <figure>${a.背中 ? `<img data-道="${逃(a.背中)}" alt="後ろから見たアバター">` : `<div class="まだ">まだありません</div>`}
     <figcaption>背中（手前の席）</figcaption></figure>
-  <figure><img data-道="${逃(a.顔)}" alt="顔"><figcaption>顔</figcaption></figure>
+  <figure><img data-道="${逃(a.顔)}" alt="アバターの顔"><figcaption>顔</figcaption></figure>
 </div>`;
 
 /* ── 廊下（部屋の一覧） ─────────────────────── */
@@ -276,14 +281,14 @@ function 廊下(){
     <div class="読み方" id="読み方">${待ちの画面("数えています")}</div>
   </section>`;
   読み方を描く();
-  // 誰がいるかを出す
+  // だれがいるかを出す
   for(const [id, 部屋] of 出す部屋ら()){
     片づけ.push(土台.席を見張る(id, 席ら=>{
       const 数 = document.getElementById(`居る数-${id}`), 列 = document.getElementById(`顔の列-${id}`);
       if(!数) return;
       const 満席 = 席ら.length >= 部屋.席.length;
       数.textContent = 満席 ? `いまは満席です（${部屋.席.length}人）。のぞいて、ベンチが空くのを待つことはできます`
-        : 席ら.length ? `いま${席ら.length}人が読んでいます（${部屋.席.length}席）` : `いまは誰もいません（${部屋.席.length}席）`;
+        : 席ら.length ? `いま${席ら.length}人が読んでいます（${部屋.席.length}席）` : `いまは、だれもいません（${部屋.席.length}席）`;
       const 札 = document.getElementById(`札-${id}`);
       // ⚠️ 前は「入る」という札で、何のためのものか分かりにくかった（配信者）。行全体が押せる。札は「何が起きるか」を言う
       if(札) 札.textContent = 満席 ? "のぞく →" : "ここで読む →";
@@ -304,9 +309,8 @@ function 廊下(){
 async function 本のランキングを描く(本){
   const 置き場 = document.getElementById("本のランキング");
   if(!置き場) return;
-  if(!本) return 置き場.innerHTML = `<p class="注">いまは数えられませんでした。</p>`;
+  if(!本) return 置き場.innerHTML = `<p class="誤りの字">いまは数えられませんでした。</p>`;
   const 表 = await 本の表();
-  const 時間に = 分 => 分 >= 60 ? `${Math.floor(分 / 60)}時間${分 % 60 ? (分 % 60) + "分" : ""}` : `${分}分`;
   const 列 = (見出し, 本ら, 単位) => `
     <div class="読み方の列">
       <h3>${見出し}</h3>
@@ -314,7 +318,7 @@ async function 本のランキングを描く(本){
         <span class="順位">${i + 1}</span>
         ${表紙(表.引く(x.本, x.題))}
         <span class="名 書籍名">${書籍名(表.引く(x.本, x.題), x.題)}</span><span class="数">${単位(x.数)}</span></div>`).join("")
-        : `<p class="注">まだありません</p>`}
+        : `<p class="注">まだありません。</p>`}
     </div>`;
   置き場.innerHTML =
     列("読了の数", 本.読了, n=>`${n}回`) +
@@ -330,14 +334,13 @@ async function 読み方を描く(){
   const 置き場 = document.getElementById("読み方");
   if(!置き場) return;
   本のランキングを描く(r?.本);
-  if(!r) return 置き場.innerHTML = `<p class="注">いまは数えられませんでした。</p>`;
-  const 時間に = 分 => 分 >= 60 ? `${Math.floor(分 / 60)}時間${分 % 60 ? (分 % 60) + "分" : ""}` : `${分}分`;
+  if(!r) return 置き場.innerHTML = `<p class="誤りの字">いまは数えられませんでした。</p>`;
   const 列 = (見出し, 人ら, 単位) => `
     <div class="読み方の列">
       <h3>${見出し}</h3>
       ${人ら.length ? 人ら.map(x=>`<div class="読み方の人">${顔の絵({ アバター:{ 顔:x.顔 } }, "中")}
         <span class="名">${逃(x.名)}</span><span class="数">${単位(x.数)}</span></div>`).join("")
-        : `<p class="注">まだだれもいません</p>`}
+        : `<p class="注">まだ、だれもいません。</p>`}
     </div>`;
   置き場.innerHTML =
     列("たくさんの本を", r.冊, n=>`${n}冊`) +
@@ -358,7 +361,7 @@ function 部屋の頁(){
   </section>
   <section class="節" style="padding-top:22px">
     <p class="気配" id="気配"></p>
-    <div class="舞台" id="舞台" style="aspect-ratio:${部屋.比}"><img class="背景" src="${部屋の絵(部屋)}" alt="${逃(部屋.名)}の部屋"></div>
+    <div class="舞台" id="舞台" style="aspect-ratio:${部屋.比}"><img class="背景" src="${部屋の絵(部屋)}" alt="${逃(部屋.名)}の景色"></div>
     <div id="手もと"></div>
   </section>
   <section class="節">
@@ -538,7 +541,7 @@ function 部屋を描き直す(){
       <span class="名">${逃(人?.名 || "…")}</span>
       <span class="題">${s.題 ? `『${逃(s.題)}』` : `<span class="注">（書籍名は出していません）</span>`}</span>
       <span class="時">${分に(Date.now() - s.入った)}</span></div>`;
-  }).join("") : `<p class="注">まだ誰もいません。</p>`;
+  }).join("") : `<p class="注">いまは、だれもいません。</p>`;
   絵を入れる(列);
   手もとを描く();
 }
@@ -684,7 +687,7 @@ function 本の窓を描く(){
   const 座る = w.やること === "席に着く";
   if(w.申請) return 窓を出す("本の登録を申請する", `
     <p class="窓の文" style="font-size:14px">一覧に無い本を教えてください。管理者が確かめてから<b>本登録</b>にします。
-      それまでは<b>仮登録</b>ですが、申請したあなたは、この題ですぐに${座る ? "座れます" : "替えられます"}。</p>
+      それまでは<b>仮登録</b>ですが、申請したあなたは、この本ですぐに${座る ? "座れます" : "替えられます"}。</p>
     ${/* Amazon のリンク・ISBN から書誌を引く（Hongaeshi の申請の窓と同じ。2026-09-30 配信者） */ ""}
     <label class="名札" for="申amazon">Amazon の URL（任意・ここから書誌を引けます）</label>
     <div class="欄と釦">
@@ -744,7 +747,7 @@ async function 書誌を入れる(isbn){
     『${逃(棚の本.題)}』 ${逃(本の見出し(棚の本))}
     <div class="釦たち" style="margin-top:8px"><button class="釦 枠だけ 小" data-する="棚の本を選ぶ" data-本="${逃(棚の本.id)}">この本を選ぶ</button></div></div>`);
   const r = await ISBNで確かめる(isbn);
-  if(!r) return 出す(`<p class="注" style="color:var(--誤り)">その ISBN の書誌は見つかりませんでした。下に手で書いてください。</p>`);
+  if(!r) return 出す(`<p class="誤りの字">その ISBN の書誌は見つかりませんでした。下に手で書いてください。</p>`);
   const 入れる = (id, v)=>{ const e = document.getElementById(id); if(e && v) e.value = v; };
   入れる("申題", r.題); 入れる("申著", r.著); 入れる("申版元", r.版元); 入れる("申isbn", r.isbn);
   if(本窓) 本窓.申請のページ = r.ページ || 0;
@@ -756,7 +759,7 @@ async function 書誌を入れる(isbn){
    前は空いている席の番号の若い順で、いつも同じベンチの同じ側だった。
    ⚠️ 「まず別々のベンチに1人ずつ、埋まったら隣に」は残す：
       誰も座っていないベンチの席から**ランダム**に → どのベンチにも人がいれば、隣の席から**ランダム**に。
-      最後に、埋まって見える席も並べておく（3分動きの無い席は、土台が空きとして座らせる） */
+      最後に、埋まって見える席も並べておく（12時間動きの無い席は、土台が空きとして座らせる） */
 function 座る順(部屋){
   const 座られた = new Set(状態.席ら.map(s=>s.番));
   const 混ぜる = a => a.map(v=>[Math.random(), v]).sort((x, y)=>x[0] - y[0]).map(x=>x[1]);
@@ -789,7 +792,7 @@ async function 本で決める(el){
       窓を閉じる();
       手もとを描く();
       知らせる("ちょうど今、最後のベンチが埋まりました。空いたら、お知らせします", true);
-    }else 知らせる(w.やること === "席に着く" ? "席に着けませんでした" : "本を替えられませんでした", true);
+    }else 知らせる(w.やること === "席に着く" ? "ベンチに座れませんでした" : "本を替えられませんでした", true);
   }
 }
 
@@ -859,17 +862,17 @@ async function 記録の頁(){
   const 数字 = (名, ms) =>{
     const 分 = Math.round(ms / 60000);
     return `<div class="数字"><div class="名">${名}</div>
-      <div class="値">${分 >= 60 ? `${Math.floor(分 / 60)}<small>時間</small>${分 % 60}<small>分</small>` : `${分}<small>分</small>`}</div></div>`;
+      <div class="値">${分 >= 60 ? `${Math.floor(分 / 60)}<small>時間</small>${分 % 60 ? `${分 % 60}<small>分</small>` : ""}` : `${分}<small>分</small>`}</div></div>`;
   };
   中.innerHTML = `
     <div class="数字たち">
-      ${数字("Today", 計(r=>r.始め >= 今日の始め.getTime()))}
-      ${数字("7 days", 計(r=>r.始め >= Date.now() - 7 * 86400000))}
-      ${数字("All", 計(()=>true))}
+      ${数字("今日", 計(r=>r.始め >= 今日の始め.getTime()))}
+      ${数字("この7日間", 計(r=>r.始め >= Date.now() - 7 * 86400000))}
+      ${数字("これまで", 計(()=>true))}
     </div>
     <div class="数字たち" style="margin-top:0;border-top:none">
-      <div class="数字"><div class="名">Books</div><div class="値">${読了ら.length}<small>冊</small></div></div>
-      <div class="数字"><div class="名">Pages</div><div class="値">${読了ら.reduce((s, r)=>s + (r.ページ || 0), 0).toLocaleString()}<small>ページ</small></div></div>
+      <div class="数字"><div class="名">冊数</div><div class="値">${読了ら.length}<small>冊</small></div></div>
+      <div class="数字"><div class="名">ページ数</div><div class="値">${読了ら.reduce((s, r)=>s + (r.ページ || 0), 0).toLocaleString()}<small>ページ</small></div></div>
       <div class="数字"></div>
     </div>
     <p class="注">冊数とページ数は、「読み終える」で「この本を最後まで読んだ」に印を付けた本だけを数えます。</p>
@@ -878,7 +881,9 @@ async function 記録の頁(){
       <div class="記録の列">
         ${記録.length ? 記録.map(r=>`<div class="記録">
           <span class="日">${日付(r.始め)}</span>
-          <span class="題">${表紙(表.引く(r.本, r.題))}<span>${書籍名(表.引く(r.本, r.題), r.題)}</span></span>
+          ${r.題 === 土台.題を出さない印
+            ? `<span class="題"><span class="表紙 小" aria-hidden="true"></span><span class="注">（書籍名を出さずに読んだ回）</span></span>`
+            : `<span class="題">${表紙(表.引く(r.本, r.題))}<span>${書籍名(表.引く(r.本, r.題), r.題)}</span></span>`}
           <span class="分">${分に(長さ(r))}</span></div>`).join("")
           : `<p class="注">まだありません。ベンチに座ると、ここに残ります。</p>`}
       </div>
@@ -899,13 +904,13 @@ async function 管理の頁(){
     <p class="英字の札">Admin</p>
     <h1 class="中見出し">本の申請</h1>
     <p class="導き">仮登録の本です。確かめて、本登録にするか見送るかを決めてください。</p>
-    <div id="申請の列">${待ちの画面("読んでいます")}</div>
+    <div id="申請の列">${待ちの画面("読みこんでいます")}</div>
   </section>`;
   let 申請ら;
   try{ 申請ら = await 土台.申請らを読む(); }catch(e){ console.error(e); 申請ら = null; }
   const 列 = document.getElementById("申請の列");
   if(!列) return;
-  if(!申請ら) return 列.innerHTML = `<p class="誤りの字">読めませんでした。</p>`;
+  if(!申請ら) return 列.innerHTML = `<p class="誤りの字">申請を読めませんでした。</p>`;
   if(!申請ら.length) return 列.innerHTML = `<p class="注" style="margin-top:24px">いま、申請はありません。</p>`;
   列.innerHTML = `<div class="申請の列">${申請ら.map(b=>`
     <div class="申請">
@@ -930,7 +935,7 @@ async function 書誌を引き直す(el){
   const id = el.dataset.本, 確認 = document.getElementById(`管確認-${id}`);
   if(確認) 確認.innerHTML = `<p class="注">さがしています…</p>`;
   const r = await ISBNで確かめる(el.dataset.isbn);
-  if(!r){ if(確認) 確認.innerHTML = `<p class="注" style="color:var(--誤り)">書誌は見つかりませんでした。</p>`; return; }
+  if(!r){ if(確認) 確認.innerHTML = `<p class="誤りの字">書誌は見つかりませんでした。</p>`; return; }
   const 入れる = (k, v)=>{ const e = document.getElementById(`${k}-${id}`); if(e && v) e.value = v; };
   入れる("管題", r.題); 入れる("管著", r.著); 入れる("管版元", r.版元); if(r.ページ) 入れる("管ページ", String(r.ページ));
   if(確認) 確認.innerHTML = `<p class="注">openBD の書誌を入れました：『${逃(r.題)}』 ${逃(r.著)}／${逃(r.版元)}${r.ページ ? `・${r.ページ}ページ` : ""}</p>`;
@@ -948,7 +953,7 @@ async function 申請を決める(el, 承認){
   }catch(e){
     console.error(e);
     el.disabled = false;
-    知らせる("決められませんでした", true);
+    知らせる(承認 ? "本登録にできませんでした" : "見送れませんでした", true);
   }
 }
 
@@ -977,8 +982,8 @@ function 自分の頁(){
     </div>
     <p class="注">場所ごとに、決まった方を向いて座ります。奥の席で逆を向いていたら押してください。</p>
     ${a.背中 ? "" : `<div class="釦たち" style="margin-top:18px">
-      <button class="釦 枠だけ 小" data-する="背中を足す">背中の姿を足す</button></div>
-    <p class="注">手前の席では、テーブルに向かう背中が見えます。いまの姿から背中だけを描きます（1分ほど。1日の回数に1回数えます）。</p>`}
+      <button class="釦 枠だけ 小" data-する="背中を足す">背中のアバターを足す</button></div>
+    <p class="注">手前の席では、テーブルに向かう背中が見えます。いまのアバターから背中だけを描きます（1分ほど。1日の回数に1回数えます）。</p>`}
     <div class="帳">
       ${写真の欄()}
       ${a.状態 === "failed" && a.誤り ? `<p class="誤りの字">${逃(a.誤り)}</p>` : ""}
@@ -1027,13 +1032,18 @@ async function 作る(名){
     console.error(e);
     状態.頼んでいる = false;
     状態.作ったばかり = false;
-    知らせる(e.message || "作れませんでした", true);
+    知らせる(e.message || "アバターを作れませんでした", true);
     描く();
   }
 }
 
 const 動き = {
-  入る: ()=>土台.入る().catch(e=>知らせる("ログインできませんでした：" + (e.code || e.message), true)),
+  // Firebase の英語の誤り（auth/… など）は画面に出さない。ログインの窓を自分で閉じたときは何も言わない
+  入る: ()=>土台.入る().catch(e=>{
+    console.error(e);
+    if(/popup-closed|cancelled-popup/.test(e?.code || "")) return;
+    知らせる("ログインできませんでした。もう一度お試しください", true);
+  }),
   出る: async ()=>{ await 土台.出る(); 状態.自分 = undefined; 行く("廊下"); },
   行く: el=>行く(el.dataset.頁),
   場所へ: el=>{ 状態.部屋 = 部屋ら[el.dataset.部屋] ? el.dataset.部屋 : 最初の部屋; 行く("部屋"); },
@@ -1044,17 +1054,17 @@ const 動き = {
   名を直す: async ()=>{
     const 名 = 名を読む(); if(!名) return;
     try{ await 土台.名を決める(名); 知らせる("ユーザ名を直しました"); }
-    catch(e){ 知らせる("直せませんでした", true); }
+    catch(e){ 知らせる("ユーザ名を直せませんでした", true); }
   },
   向きを反対にする: async ()=>{
     try{ await 土台.向きを反対にする(!状態.自分.反転); 知らせる("向きを反対にしました"); }
-    catch(e){ 知らせる("変えられませんでした", true); }
+    catch(e){ 知らせる("向きを変えられませんでした", true); }
   },
   背中を足す: async el=>{
     el.disabled = true;
     el.textContent = "背中を描いています…";
-    try{ await 土台.背中を足す(); 知らせる("背中の姿を足しました"); }
-    catch(e){ console.error(e); el.disabled = false; el.textContent = "背中の姿を足す"; 知らせる(e.message || "描けませんでした", true); }
+    try{ await 土台.背中を足す(); 知らせる("背中のアバターを足しました"); }
+    catch(e){ console.error(e); el.disabled = false; el.textContent = "背中のアバターを足す"; 知らせる(e.message || "背中を描けませんでした", true); }
   },
   席に着く: ()=>満席か() ? 知らせる("いまは満席です。空いたら、お知らせします", true) : 題の窓("席に着く"),
   本を替える: ()=>題の窓("本を替える"),
@@ -1165,7 +1175,7 @@ const 動き = {
     el.disabled = true;
     el.textContent = "投稿の準備をしています…";
     const { 題, 分, 場所 } = 読み終えの中身;
-    const 文 = 題 ? `『${題}』を${分}分、${場所}のベンチで読みました。` : `${場所}のベンチで、${分}分読みました。`;
+    const 文 = 題 ? `『${題}』を${時間に(分)}、${場所}のベンチで読みました。` : `${場所}のベンチで、${時間に(分)}読みました。`;
     const スマホ = matchMedia("(pointer: coarse)").matches;
     // パソコン：窓は押した瞬間に開く（絵を置き終わってから開くと、ポップアップとして止められる）
     const 窓 = スマホ ? null : open("", "_blank");
@@ -1228,7 +1238,7 @@ function 読み終える窓(){
   読み終えの絵 = null;
   読み終えの中身 = { 題, 本, 分, 場所 };
   窓を出す("読み終える", `
-    <p class="窓の文">${題 ? `『${逃(題)}』を、` : ""}${逃(場所)}のベンチで <b>${分}分</b> 読みました。</p>
+    <p class="窓の文">${題 ? `『${逃(題)}』を、` : ""}${逃(場所)}のベンチで <b>${時間に(分)}</b> 読みました。</p>
     ${題 ? `<label class="読了の印"><input type="checkbox" id="読了の印"> この本を最後まで読んだ（読了）</label>` : ""}
     <div id="総ページの欄" hidden>
       <label class="名札" for="総ページ">この本の総ページ数（わかれば）</label>
@@ -1389,10 +1399,10 @@ async function 共有の絵を描く(題, 分, 場所){
   g.textAlign = "left";
   g.fillStyle = "#17141f";
   g.font = '600 42px "Zen Old Mincho", serif';
-  g.fillText(題 ? 詰める(g, `『${題}』`, W - 80) : `${分}分、読みました`, 40, 66);
+  g.fillText(題 ? 詰める(g, `『${題}』`, W - 80) : `${時間に(分)}、読みました`, 40, 66);
   g.fillStyle = "#59526b";
   g.font = '400 24px "Zen Old Mincho", serif';
-  g.fillText(題 ? `${場所}のベンチで、${分}分読みました` : `${場所}のベンチで`, 40, 110);
+  g.fillText(題 ? `${場所}のベンチで、${時間に(分)}読みました` : `${場所}のベンチで`, 40, 110);
   g.textAlign = "right";
   g.fillStyle = "#6b4bc4";
   g.font = '600 18px "Hiragino Sans","Yu Gothic UI","Yu Gothic",sans-serif';
@@ -1468,5 +1478,5 @@ document.addEventListener("change", async e=>{
   描く();
 }).catch(e=>{
   console.error(e);
-  画面.innerHTML = `<section class="幕"><p class="誤りの字">ひらけませんでした：${逃(e.message)}</p></section>`;
+  画面.innerHTML = `<section class="幕"><p class="誤りの字">ひらけませんでした。時間をおいて、もう一度開いてください。</p></section>`;
 });

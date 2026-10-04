@@ -121,13 +121,13 @@ export const makeAvatar = onCall({
   const 利用者 = db.doc(`users/${私.uid}`);
   const 全員 = db.doc("meta/usage");
 
-  await 回数を使う(利用者, 全員, "座っている姿を描いています（1/3）");
+  await 回数を使う(利用者, 全員, "座って読むアバターを描いています（1/3）");
 
   const 進み = step => 利用者.set({ avatar: { step } }, { merge: true });
   try{
     const ai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
     const 座る = await 描く(ai, 写真, "photo.jpg", "image/jpeg", 座る指示);
-    await 進み("ページをめくる姿・背中・顔を描いています（2/3）");
+    await 進み("ページをめくるところ・背中・顔を描いています（2/3）");
     const 向きの約束 = 向きを見る(ai, 座る, "image/png");
     const [めくる, 顔, 背中] = await Promise.all([
       描く(ai, 座る, "sit.png", "image/png", めくる指示),
@@ -197,7 +197,7 @@ async function 回数を使う(利用者, 全員, 段階){
   const 今日 = 日本の日付();
   await db.runTransaction(async tx => {
     const [s, u] = await Promise.all([tx.get(利用者), tx.get(全員)]);
-    if(!s.exists) throw new HttpsError("failed-precondition", "先に名前を決めてください");
+    if(!s.exists) throw new HttpsError("failed-precondition", "先にユーザ名を決めてください");
     const a = s.data().avatar || {};
     const 最中 = a.status === "making" && a.at && Date.now() - a.at.toMillis() < 10 * 60 * 1000;
     if(最中) throw new HttpsError("already-exists", "いま作っているところです");
@@ -302,8 +302,11 @@ export const sharePage = onRequest({ region: "asia-northeast1" }, async (req, re
   const d = id ? (await db.doc(`shares/${id}`).get()).data() : null;
   if(!d){ res.redirect(302, "/"); return; }
   const 逃 = t => String(t ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
-  const 題 = d.title ? `『${d.title}』を${d.minutes}分、${d.place}のベンチで読みました`
-    : `${d.place}のベンチで、${d.minutes}分読みました`;   // 題を名札に出さなかった人
+  // 時間は画面と同じ「2時間5分」の形（2026-10-04 にそろえた。app.js の 時間に）
+  const 分 = Number(d.minutes) || 0;
+  const 時間 = 分 < 60 ? `${分}分` : `${Math.floor(分 / 60)}時間${分 % 60 ? (分 % 60) + "分" : ""}`;
+  const 題 = d.title ? `『${d.title}』を${時間}、${d.place}のベンチで読みました`
+    : `${d.place}のベンチで、${時間}読みました`;   // 書籍名を出さなかった人
   const 説明 = "家にいながら、景色のいい場所で読む。GEMuの静かな読書会";
   // Hosting から回ってくると、hostname は裏の処理の名前になる。元の名前は x-forwarded-host
   const ここ = `https://${req.get("x-forwarded-host") || req.hostname}/s/${id}`;
