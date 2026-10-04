@@ -4,6 +4,7 @@
    使い方（リポジトリの一番上で）：
      node 04_tools/部屋を作る.mjs rothenburg      … ローテンブルクを2枚
      node 04_tools/部屋を作る.mjs owakudani       … 箱根・大涌谷を2枚
+     node 04_tools/部屋を作る.mjs ashinoko        … 箱根・芦ノ湖を2枚
      node 04_tools/部屋を作る.mjs cafe 4          … カフェを4枚
      node 04_tools/部屋を作る.mjs bench           … 空いた席に置く空のベンチ（前向き・後ろ向きの2枚。背景は透明）
        → 気に入ったら public/部屋/bench_front.webp と bench_back.webp にする
@@ -63,6 +64,21 @@ const 指示ら = {
     "a small wooden signboard frame WITHOUT any letters, a few large rounded boulders.",
     "Bright, clear daytime, peaceful and fresh mountain air.",
     "In the front there is a flat open stone-paved viewing terrace.",
+    "IMPORTANT: leave four clear, empty spots on the front terrace (left-back, right-back, left-front, right-front)",
+    "where seated characters on benches will be added later. There are NO benches, NO chairs, NO stools at those spots.",
+    ...共通,
+  ],
+  /* 箱根・芦ノ湖（2026-10-04 配信者）。湖に立つ赤い鳥居（箱根神社の平和の鳥居）と、湖の向こうの富士山。湖畔の遊歩道 */
+  ashinoko: [
+    "Isometric diorama of a small piece of the shore of Lake Ashi (Ashinoko) in Hakone, Japan, viewed from above at a 3/4 angle,",
+    "a square cut-out block of the landscape floating on a plain background.",
+    "Calm blue lake water fills the back half of the block; a bright red Japanese torii gate stands in the water near the shore,",
+    "forested green hills of cedar trees around the lake, and the snow-capped Mount Fuji rising softly in the far distance.",
+    "A small traditional wooden sightseeing boat floats on the lake (no letters on it).",
+    "Along the near shore there is a lakeside promenade paved with flat stones, a low wooden railing at the water's edge,",
+    "a few pine trees and stone lanterns, small clusters of hydrangea bushes.",
+    "Bright, clear daytime, peaceful and fresh, gentle ripples on the water.",
+    "In the front there is a flat open stone-paved lakeside terrace.",
     "IMPORTANT: leave four clear, empty spots on the front terrace (left-back, right-back, left-front, right-front)",
     "where seated characters on benches will be added later. There are NO benches, NO chairs, NO stools at those spots.",
     ...共通,
