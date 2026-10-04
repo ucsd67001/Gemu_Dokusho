@@ -31,13 +31,12 @@ import { getStorage, ref as 置き場, getDownloadURL, uploadBytes }
   from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
 import { getFunctions, httpsCallable }
   from "https://www.gstatic.com/firebasejs/10.14.1/firebase-functions.js";
-
-export const 試し = false;
+// 席と読んだ時間の計算は 試し/土台.js と同じなので、1つのファイルにまとめてある（2026-10-04）
+import { 古いとみなす, 題を出さない印, 座った覚え, 席を突き合わせる, 記録にする, 本棚を読む,
+  読んだ時間を数える, 離れていた時間を数える, 離席を書き込む } from "./席の決まり.js";
 
 let app, auth, db, 倉, 呼ぶ;
-export let 私 = null;        // { uid, 名, メール }
-
-const 古いとみなす = 12 * 60 * 60 * 1000;   // firestore.rules の stale() と同じ12時間（画面を消して読む人のため。2026-10-04）
+let 私 = null;        // { uid, 名, メール }
 
 /* ── 立ち上げ ───────────────────────────────
    変わったら({ 私 }) を、ログインの状態が変わるたびに呼ぶ。
@@ -139,7 +138,7 @@ export async function 絵のURL(道){
 
 /* ── 席 ─────────────────────────────────
    ⚠️ 席の文書の id が席の番号。1人1席。
-   ⚠️ 1分ごとに seen を延ばす。3分延びていない席は空きとみなす（タブを閉じた人の席）。 */
+   ⚠️ 1分ごとに seen を延ばす。12時間延びていない席は空きとみなす（タブを閉じた人・画面を消したまま忘れた人の席）。 */
 function 席に(d){
   const x = d.data() || {};
   return { 番:Number(d.id), uid:x.uid, 題:x.title || "", 本:x.book || "",
@@ -147,7 +146,7 @@ function 席に(d){
 }
 const 生きた席 = 席 => Date.now() - 席.見た < 古いとみなす;
 
-// 届いたら(席ら, 出来事)。出来事は "ほかで立った"／"ほかで座っていた"／null
+// 届いたら(席ら, 出来事)。出来事は "ほかで立った"／"長く離れて立った"／"ほかで座っていた"／null（席の決まり.js の 席を突き合わせる）
 // ⚠️ 突き合わせる（合わせる：true）のは、場所の中にいるときだけ。一覧を見ているだけの端末を、座っている扱いに戻さない
 export function 席を見張る(部屋, 届いたら, { 合わせる = false } = {}){
   return onSnapshot(collection(db, "rooms", 部屋, "seats"),
@@ -155,41 +154,18 @@ export function 席を見張る(部屋, 届いたら, { 合わせる = false } =
     e=>console.error(e));
 }
 
-/* ⚠️⚠️ 同じ人が PC とスマホの両方で開いたとき（2026-09-30 配信者「本を替えるが効かない」「PC とスマホで整合が取れない」）。
-   前は、あとから座った端末が前の端末の席を消すのに、**前の端末は座っているつもりのまま**だった
-   （「本を替える」は消えた席を書き換えようとして失敗し、「生きている」も空振りしていた）。
-   → 席の様子が届くたびに、この端末の いま と、データベースの自分の席を突き合わせる：
-     ・ほかの端末で座っている → この端末も、その席に座っている扱いにする（どちらからでも替えられ、読み終えられる）
-     ・ほかの端末で本を替えた → この端末の区切りにも足す（記録が本ごとに正しく分かれる）
-     ・ほかの端末で席を立った → この端末も立った扱いにする（届いたらに "ほかで立った" を渡す） */
+// 同じ人が PC とスマホの両方で開いたときの突き合わせ（中身は 席の決まり.js）
 function 席を合わせる(部屋, 席ら){
-  const 自分の席 = 席ら.find(s=>s.uid === 私?.uid);
-  if(いま && いま.部屋 === 部屋){
-    if(!自分の席 || 自分の席.番 !== いま.番){
-      // 12時間を過ぎて席が空いたのか、ほかの端末で読み終えたのか
-      const 長く離れた = Date.now() - (いま.最後に生きていた || 0) > 古いとみなす;
-      いま = null;
-      return 長く離れた ? "長く離れて立った" : "ほかで立った";
-    }
-    const 前 = いま.区切り.at(-1);
-    if(自分の席.題 !== 前.題 || (自分の席.本 || "") !== (前.本 || ""))
-      いま.区切り.push({ 題:自分の席.題, 本:自分の席.本 || "", 始め:Date.now() });
-    return null;
-  }
-  if(!いま && 自分の席){
-    // 最後に生きていた＝席の seen（画面を消して戻ったら、ここからの時間を聞く）
-    いま = { 部屋, 番:自分の席.番, 入った:自分の席.入った, 休み:[], 最後に生きていた:自分の席.見た,
-      区切り:[{ 題:自分の席.題, 本:自分の席.本 || "", 始め:自分の席.入った }] };
-    return "ほかで座っていた";
-  }
-  return null;
+  const r = 席を突き合わせる(いま, 部屋, 席ら.find(s=>s.uid === 私?.uid));
+  いま = r.いま;
+  return r.出来事;
 }
 
 /* ⚠️⚠️ 読んだ時間の記録は、**「読み終える」で終えたときだけ**書く（2026-09-29 配信者）。
       座っているあいだは書かない。本を替えた区切り（題と始めの時刻）は、ここで覚えておくだけ。
       ほかの頁へ移る・タブを閉じる・ログアウトは、席を立つだけで記録しない。
       （前は座った瞬間に記録を作り、1分ごとに延ばしていた。閉じただけの回も残っていた） */
-let いま = null;   // { 部屋, 番, 入った, 区切り:[{ 題, 本, 始め }] }　題が空＝名札に出さない
+let いま = null;   // 座っているあいだの覚え（形は 席の決まり.js の 座った覚え）
 
 // 順：座ってみる席の番号の並び（画面の 座る順 が、空いたベンチを優先してランダムに決める）。数なら 0,1,2… の順
 export async function 座る(部屋, 題, 順, 本 = ""){
@@ -211,8 +187,7 @@ export async function 座る(部屋, 題, 順, 本 = ""){
         tx.set(r, { uid:私.uid, title:題, since:serverTimestamp(), seen:serverTimestamp(), ...(本 ? { book:本 } : {}) });
       });
     }catch(e){ continue; }
-    const 今 = Date.now();
-    いま = { 部屋, 番, 入った:今, 休み:[], 最後に生きていた:今, 区切り:[{ 題, 本, 始め:今 }] };
+    いま = 座った覚え(部屋, 番, Date.now(), 題, 本);
     return 番;
   }
   throw new Error("満席です");
@@ -237,47 +212,12 @@ export async function 生きている(){
   await updateDoc(doc(db, "rooms", いま.部屋, "seats", String(いま.番)), { seen:serverTimestamp() });
 }
 
-/* ⚠️⚠️ 画面を消して読むとき（2026-10-04 配信者）。
-   使い方は「場所に入る → スマホの画面を消して本を読む → 読み終えたら画面をつけて、読み終える」。
-   前は「生きている」が3分届かないと席を空き扱いにしていたので、30分〜数時間後に画面をつけると、席を立った扱いになっていた。
-   → 席は **12時間** 保つ（firestore.rules の stale() と 古いとみなす をそろえる。ひと晩の消し忘れまで）。
-     **3時間以上** 離れてから戻ったら（配信者「30分以上 ⇒ 3時間以上」）、画面が「そのあいだに読んだ時間」を聞き（離席を記録する）、
-     読んでいなかった時間は **休み** として、記録から引く。3時間より短ければ、そのまま読んでいたものとする。
-     12時間を過ぎたら席が空き、その回は記録に残らない */
-export const 聞く離れ = 3 * 60 * 60 * 1000;
+/* 画面を消して読む人の決まり（中身は 席の決まり.js。2つの土台で同じ） */
+export { 聞く離れ, 題を出さない印 } from "./席の決まり.js";
 export const 席を保つ = 古いとみなす;
-export const 離れていた時間 = () => いま ? Date.now() - (いま.最後に生きていた || Date.now()) : 0;
-// 離れていたあいだに読んだ分（自己申告）。それより後ろの、戻るまでの時間は休みとして記録から引く
-export function 離席を記録(読んだ分){
-  if(!いま) return;
-  const から = いま.最後に生きていた || Date.now(), まで = Date.now();
-  const 読み終わり = Math.min(まで, から + Math.max(0, 読んだ分) * 60000);
-  if(読み終わり < まで) (いま.休み ||= []).push({ から:読み終わり, まで });
-  いま.最後に生きていた = まで;
-}
-// [a, b] から休みを引いた区間たち
-function 休みを引く(a, b, 休み = []){
-  let 区間 = [[a, b]];
-  for(const h of 休み){
-    区間 = 区間.flatMap(([x, y])=>{
-      if(h.まで <= x || h.から >= y) return [[x, y]];
-      const 残り = [];
-      if(h.から > x) 残り.push([x, h.から]);
-      if(h.まで < y) 残り.push([h.まで, y]);
-      return 残り;
-    });
-  }
-  return 区間.filter(([x, y])=>y - x >= 1000);
-}
-// 休みを引いた、読んだ時間（ミリ秒）
-export function 読んだ時間(){
-  if(!いま) return 0;
-  return 休みを引く(いま.入った, Date.now(), いま.休み).reduce((s, [x, y])=>s + y - x, 0);
-}
-
-
-// ⚠️ 記録に保存する印（画面には出さない。記録のページは「（書籍名を出さずに読んだ回）」と出す）。functions の集計もこの文字で見分ける
-export const 題を出さない印 = "（題を出さずに読んだ本）";
+export const 離れていた時間 = () => 離れていた時間を数える(いま);
+export const 離席を記録 = 読んだ分 => 離席を書き込む(いま, 読んだ分);
+export const 読んだ時間 = () => 読んだ時間を数える(いま);
 
 /* 席を立つ。記録する＝true は「読み終える」のときだけ。本を替えた区切りごとに1件ずつ書く。
    読了＝{ 題, ページ } を渡すと、読了も1件書く（「この本を最後まで読んだ」に印を付けたとき） */
@@ -289,19 +229,10 @@ export async function 立つ({ 記録する = false, 読了 = null } = {}){
         ほかの端末で読み続けていれば、その端末が「生きている」を送って席を保つ。どこも読んでいなければ12時間で空く。
         （前は離れるたびに席を消していて、スマホのタブを閉じると PC で読んでいる席まで消えた） */
   if(!記録する) return;
-  const 書く = [];
-  if(記録する){
-    const 終わり = Date.now();
-    席.区切り.forEach((k, i)=>{
-      const 次 = 席.区切り[i + 1]?.始め ?? 終わり;
-      // ⚠️ 題を出さなかった区切りも、時間は残す（自分の記録にだけ「題を出さずに読んだ本」として）
-      // ⚠️ 休み（画面を消していて、読んでいなかったと申告した時間）は引く。引いて分かれた区間ごとに1件
-      for(const [a, b] of 休みを引く(k.始め, 次, 席.休み))
-        書く.push(addDoc(collection(db, "logs"), { uid:私.uid, room:席.部屋, title:k.題 || 題を出さない印,
-          from:Timestamp.fromMillis(a), to:Timestamp.fromMillis(b), ...(k.本 ? { book:k.本 } : {}) }));
-    });
-  }
-  if(記録する && 読了) 書く.push(addDoc(collection(db, "finishes"),
+  // 区切りごと・休みで分かれた区間ごとに1件（席の決まり.js の 記録にする）
+  const 書く = 記録にする(席).map(r=>addDoc(collection(db, "logs"), { uid:私.uid, room:r.部屋, title:r.題,
+    from:Timestamp.fromMillis(r.始め), to:Timestamp.fromMillis(r.終わり), ...(r.本 ? { book:r.本 } : {}) }));
+  if(読了) 書く.push(addDoc(collection(db, "finishes"),
     { uid:私.uid, title:読了.題, pages:読了.ページ, at:serverTimestamp(), ...(読了.本 ? { book:読了.本 } : {}) }));
   await Promise.all([
     ...書く,
@@ -340,16 +271,7 @@ function 本に(d){
     申請日:x.created?.toMillis?.() || 0 };
 }
 
-/* Hongaeshi から写した本棚（public/本棚.json。04_tools/Hongaeshiから写す.mjs で作る）。
-   **本登録の本**として一覧に混ぜる（2026-09-29 配信者「Hongaeshi の図書データをコピーして」）。
-   ⚠️ Firestore には入っていない（こちらの管理用の鍵が無いため）。id は "h-…" */
-let 本棚の約束 = null;
-export function 本棚を読む(){
-  本棚の約束 ||= fetch("/本棚.json").then(r=>r.ok ? r.json() : { 本:[] })
-    .then(j=>(j.本 || []).map(b=>({ ...b, ひとこと:"", 状態:"本登録", 申請者:"" })))
-    .catch(()=>[]);
-  return 本棚の約束;
-}
+// 本棚（Hongaeshi から写した本）と、本登録の本・自分が申請した本をまとめる。本棚を読む は 席の決まり.js
 export async function 本らを読む(){
   const [本登録, 自分の, 棚] = await Promise.all([
     getDocs(query(collection(db, "books"), where("status", "==", "approved"))),
@@ -381,8 +303,6 @@ export async function 申請を決める(id, 承認, 直し = {}){
 }
 
 /* ── 記録 ─────────────────────────────── */
-
-
 export async function 読了を読む(){
   const s = await getDocs(query(collection(db, "finishes"), where("uid", "==", 私.uid)));
   return s.docs.map(d=>{ const x = d.data(); return { 題:x.title, 本:x.book || "", ページ:x.pages || 0, いつ:x.at?.toMillis?.() || 0 }; });
