@@ -47,22 +47,50 @@ function 知らせる(文, 悪い=false){
   document.querySelector(".知らせ")?.remove();
   const d = document.createElement("div");
   d.className = "知らせ" + (悪い ? " 悪い" : "");
+  d.setAttribute("role", 悪い ? "alert" : "status");   // 読み上げに伝える
   d.textContent = 文;
   document.body.appendChild(d);
   setTimeout(()=>d.remove(), 3800);
 }
 
-function 窓を出す(題, 中){
-  document.getElementById("窓").innerHTML = `
-  <div class="覆い" data-する="覆いの外">
-    <div class="窓" role="dialog" aria-label="${逃(題)}">
+/* 小さな画面（ダイアログ）。
+   閉じられない … ✕ を出さず、外側を押しても Esc でも閉じない。答えてもらう画面だけ
+                  （「おかえりなさい」と、スマホの X 投稿。閉じると、記録を残したのに場所のページにとどまった）
+   ⚠️ 開いたら中にフォーカスを移し（Tab は中だけを回る）、閉じたら開く前の場所へ戻す */
+let 窓の前のフォーカス = null;
+function 窓を出す(題, 中, { 閉じられない = false } = {}){
+  const 置き場 = document.getElementById("窓");
+  if(!置き場.innerHTML) 窓の前のフォーカス = document.activeElement;
+  置き場.innerHTML = `
+  <div class="覆い" ${閉じられない ? "" : `data-する="覆いの外"`}>
+    <div class="窓" role="dialog" aria-modal="true" aria-label="${逃(題)}" tabindex="-1" ${閉じられない ? "data-閉じられない" : ""}>
       <div class="窓の頭"><h3>${逃(題)}</h3>
-        <button class="閉じる" data-する="窓を閉じる" aria-label="閉じる">✕</button></div>
+        ${閉じられない ? "" : `<button class="閉じる" data-する="窓を閉じる" aria-label="閉じる">✕</button>`}</div>
       <div class="窓の中">${中}</div>
     </div></div>`;
-  document.querySelector("#窓 input")?.focus();
+  // ⚠️ 入力欄にはフォーカスしない（スマホでキーボードが出て、本の一覧が隠れる）。画面そのものにフォーカスする
+  置き場.querySelector(".窓").focus();
 }
-const 窓を閉じる = () =>{ document.getElementById("窓").innerHTML = ""; 本窓 = null; };   // 本の窓の状態も消す（読み込みのあとで開き直らないように）
+function 窓を閉じる(){
+  const 置き場 = document.getElementById("窓");
+  const 開いていた = !!置き場.innerHTML;
+  置き場.innerHTML = "";
+  本窓 = null;   // 本の窓の状態も消す（読み込みのあとで開き直らないように）
+  if(開いていた && 窓の前のフォーカス?.isConnected) 窓の前のフォーカス.focus();
+  窓の前のフォーカス = null;
+}
+// Esc で閉じる／Tab は小さな画面の中だけを回る
+document.addEventListener("keydown", e=>{
+  const 窓 = document.querySelector("#窓 .窓");
+  if(!窓) return;
+  if(e.key === "Escape" && !窓.hasAttribute("data-閉じられない")){ e.preventDefault(); 窓を閉じる(); return; }
+  if(e.key !== "Tab") return;
+  const 押せる = [...窓.querySelectorAll("a[href],button:not(:disabled),input:not(:disabled),[tabindex='0']")].filter(x=>x.offsetParent);
+  if(!押せる.length) return;
+  const 最初 = 押せる[0], 最後 = 押せる.at(-1);
+  if(e.shiftKey && (document.activeElement === 最初 || document.activeElement === 窓)){ e.preventDefault(); 最後.focus(); }
+  else if(!e.shiftKey && document.activeElement === 最後){ e.preventDefault(); 最初.focus(); }
+});
 
 // 絵の道（Storage の場所）から URL を引いて、img[data-道] に入れる
 const URLの控え = new Map();
@@ -169,8 +197,8 @@ function 入口(){
     <p class="英字の札">GEMu Dokusho</p>
     <h1 class="大見出し">家にいながら、<br>景色のいい場所で読む。</h1>
     <p class="導き">だれにも邪魔されずに、ひとりで静かに本を読むのが好き。でも、景色のいいところで読むのにも、ちょっと憧れている。インドア派だから、なかなか行けないけれど。</p>
-    <p class="導き" style="margin-top:10px">ここでは、自分をブロックのアバターにして、世界の、読書が気持ちよさそうな場所のベンチに座ります。話さなくていい。となりのベンチでも、だれかが自分の本を読んでいます。最初の場所は、ドイツのローテンブルクです。</p>
-    <div class="釦たち" style="margin-top:30px">
+    <p class="導き 続き">ここでは、自分をブロックのアバターにして、世界の、読書が気持ちよさそうな場所のベンチに座ります。話さなくていい。となりのベンチでも、だれかが自分の本を読んでいます。最初の場所は、ドイツのローテンブルクです。</p>
+    <div class="釦たち 上の広い間">
       <button class="釦" data-する="入る">${試しか ? "試しに入る" : "Google でログイン"}</button>
     </div>
     <p class="注">${試しか
@@ -184,12 +212,12 @@ let 選んだ写真 = null;   // 縮めた data URL
 
 function 写真の欄(){
   return `
-    <label class="名札">自分の写真か、絵</label>
+    <p class="名札">自分の写真か、絵</p>
     <div class="写真の枠">
       ${選んだ写真 ? `<img class="写真の見本" src="${選んだ写真}" alt="">` : `<div class="写真の見本">まだです</div>`}
       <div>
         <label class="釦 枠だけ 小">写真を選ぶ<input type="file" accept="image/*" data-する="写真"></label>
-        <p class="注" style="margin-top:8px">自分の写真でも、好きなキャラクターの絵でも。写っているものを、そのままブロックのアバターにします。</p>
+        <p class="注 近く">自分の写真でも、好きなキャラクターの絵でも。写っているものを、そのままブロックのアバターにします。</p>
       </div>
     </div>
     <p class="注">写真は、アバターを作るために OpenAI へ送るだけで、保存しません。残るのは、できあがったブロックの絵だけです。</p>`;
@@ -206,8 +234,8 @@ function 登録(){
     <input id="名の欄" class="欄" maxlength="20" placeholder="例：しおり" value="${逃(状態.自分?.名 || "")}">
     ${写真の欄()}
     ${誤り ? `<p class="誤りの字">${逃(誤り)}</p>` : ""}
-    <div class="釦たち" style="margin-top:30px">
-      <button class="釦 藤" data-する="はじめて作る">アバターを作る</button>
+    <div class="釦たち 上の広い間">
+      <button class="釦" data-する="はじめて作る">アバターを作る</button>
     </div>
     <p class="注">できあがるまで、1〜2分かかります。</p>
   </section>`;
@@ -231,7 +259,7 @@ function できあがり(){
     <h1 class="中見出し">できました</h1>
     <p class="導き">奥の席では顔が、手前の席では背中が見えます。ときどき、ページをめくります。</p>
     ${三枚(a)}
-    <div class="釦たち" style="margin-top:30px">
+    <div class="釦たち 上の広い間">
       <button class="釦" data-する="場所へ" data-部屋="${最初の部屋}">${逃(部屋ら[最初の部屋].名)}へ</button>
       <button class="釦 枠だけ" data-する="行く" data-頁="自分">自分のページで作り直す</button>
     </div>
@@ -259,15 +287,15 @@ function 廊下(){
     <div class="節の頭"><h2 class="節見出し">場所</h2><p class="節の添え">世界の、読書が気持ちよさそうな場所を増やしていきます</p></div>
     <div class="部屋の列">
       ${出す部屋ら().map(([id, 部屋])=>`
-      <button class="部屋の札" data-する="場所へ" data-部屋="${id}">
-        <div class="小さな舞台"><div class="舞台" id="小舞台-${id}" style="border:none;aspect-ratio:${部屋.比}"><img class="背景" src="${部屋の絵(部屋)}" alt="">${人とベンチ(部屋, [])}</div></div>
+      <div class="部屋の札" data-する="場所へ" data-部屋="${id}">
+        <div class="小さな舞台"><div class="舞台" id="小舞台-${id}" style="aspect-ratio:${部屋.比}"><img class="背景" src="${部屋の絵(部屋)}" alt="">${人とベンチ(部屋, [])}</div></div>
         <div>
           <div class="部屋の名">${逃(部屋.名)}</div>
           <div class="部屋の素性" id="居る数-${id}">${逃(部屋.添え)}</div>
           <div class="顔の列" id="顔の列-${id}"></div>
         </div>
-        <span class="釦 小 枠だけ 入口の釦" id="札-${id}">ここで読む →</span>
-      </button>`).join("")}
+        <button class="釦 小 枠だけ 入口の釦" id="札-${id}" data-する="場所へ" data-部屋="${id}">ここで読む →</button>
+      </div>`).join("")}
     </div>
   </section>
   <section class="節">
@@ -354,12 +382,12 @@ function 部屋の頁(){
   if(!部屋ら[状態.部屋]) 状態.部屋 = 最初の部屋;
   const 部屋 = 部屋ら[状態.部屋];
   画面.innerHTML = `
-  <section class="幕" style="padding-top:34px">
+  <section class="幕 詰めて">
     <p class="英字の札">${逃(部屋.英字)}</p>
     <h1 class="中見出し">${逃(部屋.名)}</h1>
     <p class="導き">${逃(部屋.添え)}</p>
   </section>
-  <section class="節" style="padding-top:22px">
+  <section class="節 詰めて">
     <p class="気配" id="気配"></p>
     <div class="舞台" id="舞台" style="aspect-ratio:${部屋.比}"><img class="背景" src="${部屋の絵(部屋)}" alt="${逃(部屋.名)}の景色"></div>
     <div id="手もと"></div>
@@ -466,7 +494,7 @@ function 戻りの窓(離れ){
     <div class="窓の釦">
       <button class="釦 全幅" data-する="戻りを記録">この時間、読んでいました</button>
       <button class="釦 枠だけ 全幅" data-する="戻りを記録しない">読んでいませんでした</button>
-    </div>`);
+    </div>`, { 閉じられない:true });
 }
 
 function 戻りを記録(読んだ分){
@@ -677,7 +705,7 @@ function 本の候補(){
   // ⚠️ 表紙は Amazon へのリンクなので、選ぶ釦の中には入れられない（釦の中にリンクを置けない）。札を div にして横に並べる
   return 候補.map(b=>`<div class="本の候補の札 ${w.選んだ?.id === b.id ? "いま" : ""}" data-本="${逃(b.id)}">
     ${表紙(b)}
-    <button class="本の候補の字" data-する="本を選ぶ" data-本="${逃(b.id)}">
+    <button class="本の候補の字" data-する="本を選ぶ" data-本="${逃(b.id)}" aria-pressed="${w.選んだ?.id === b.id}">
       <b>『${逃(b.題)}』</b><span>${逃(本の見出し(b))}</span></button></div>`).join("");
 }
 
@@ -686,7 +714,7 @@ function 本の窓を描く(){
   if(!w) return;
   const 座る = w.やること === "席に着く";
   if(w.申請) return 窓を出す("本の登録を申請する", `
-    <p class="窓の文" style="font-size:14px">一覧に無い本を教えてください。管理者が確かめてから<b>本登録</b>にします。
+    <p class="窓の文 小さく">一覧に無い本を教えてください。管理者が確かめてから<b>本登録</b>にします。
       それまでは<b>仮登録</b>ですが、申請したあなたは、この本ですぐに${座る ? "座れます" : "替えられます"}。</p>
     ${/* Amazon のリンク・ISBN から書誌を引く（Hongaeshi の申請の窓と同じ。2026-09-30 配信者） */ ""}
     <label class="名札" for="申amazon">Amazon の URL（任意・ここから書誌を引けます）</label>
@@ -710,7 +738,7 @@ function 本の窓を描く(){
     <label class="名札" for="申ひとこと">ひとこと（任意）</label>
     <input id="申ひとこと" class="欄" maxlength="300" placeholder="例）文庫版です">
     <p class="注">書籍名だけでは別の本と取り違えるので、著者名と出版社名もお願いしています。</p>
-    <div class="釦たち" style="margin-top:20px">
+    <div class="窓の釦">
       <button class="釦 全幅" data-する="申請して決める" ${w.送信中 ? "disabled" : ""}>${w.送信中 ? "送っています…" : 座る ? "申請して、この本で座る" : "申請して、この本に替える"}</button>
       <button class="釦 枠だけ 全幅" data-する="申請をとじる">一覧に戻る</button>
     </div>`);
@@ -727,10 +755,10 @@ function 本の窓を描く(){
         <span>一覧に無いときは</span>
         <button class="釦 枠だけ 小" data-する="申請をひらく">＋ 本の登録を申請する</button>
       </div>
-      <p class="注" style="margin-top:4px">Amazon の URL から、書籍名・著者名・出版社名を自動で入れられます。</p>` : ""}
-    <div class="釦たち" style="margin-top:20px">
+      <p class="注 近く">Amazon の URL から、書籍名・著者名・出版社名を自動で入れられます。</p>` : ""}
+    <div class="窓の釦">
       ${w.出す ? `<p class="選んでいる本" id="選んでいる本">${選んでいる本の字(w)}</p>` : ""}
-      <button class="釦 全幅 決める釦" id="決める釦" data-する="題を決める" ${w.出す && !w.選んだ ? "disabled" : ""}>${決める釦の字(w)}</button>
+      <button class="釦 全幅 決める釦" id="決める釦" data-する="題を決める" ${w.出す && !w.選んだ ? "disabled" : ""}><span>${決める釦の字(w)}</span></button>
     </div>`);
 }
 
@@ -745,7 +773,7 @@ async function 書誌を入れる(isbn){
   const 棚の本 = 十三 && 本窓?.本ら?.find(b=>ISBN13にする(b.isbn) === 十三);
   if(棚の本) return 出す(`<div class="申請の知らせ"><b>この本は、もう本棚にあります。</b><br>
     『${逃(棚の本.題)}』 ${逃(本の見出し(棚の本))}
-    <div class="釦たち" style="margin-top:8px"><button class="釦 枠だけ 小" data-する="棚の本を選ぶ" data-本="${逃(棚の本.id)}">この本を選ぶ</button></div></div>`);
+    <div class="釦たち 上の狭い間"><button class="釦 枠だけ 小" data-する="棚の本を選ぶ" data-本="${逃(棚の本.id)}">この本を選ぶ</button></div></div>`);
   const r = await ISBNで確かめる(isbn);
   if(!r) return 出す(`<p class="誤りの字">その ISBN の書誌は見つかりませんでした。下に手で書いてください。</p>`);
   const 入れる = (id, v)=>{ const e = document.getElementById(id); if(e && v) e.value = v; };
@@ -814,7 +842,7 @@ function 選んでいる本を描く(){
   if(!w) return;
   const 字 = document.getElementById("選んでいる本"), 釦 = document.getElementById("決める釦");
   if(字) 字.innerHTML = 選んでいる本の字(w);
-  if(釦){ 釦.innerHTML = 決める釦の字(w); 釦.disabled = w.出す && !w.選んだ; }
+  if(釦){ 釦.innerHTML = `<span>${決める釦の字(w)}</span>`; 釦.disabled = w.出す && !w.選んだ; }
 }
 
 // 本をさがす欄は、打つたびに候補だけを描き直す（窓ごと描き直すと、打っている字の位置が飛ぶ）
@@ -870,7 +898,7 @@ async function 記録の頁(){
       ${数字("この7日間", 計(r=>r.始め >= Date.now() - 7 * 86400000))}
       ${数字("これまで", 計(()=>true))}
     </div>
-    <div class="数字たち" style="margin-top:0;border-top:none">
+    <div class="数字たち 続き">
       <div class="数字"><div class="名">冊数</div><div class="値">${読了ら.length}<small>冊</small></div></div>
       <div class="数字"><div class="名">ページ数</div><div class="値">${読了ら.reduce((s, r)=>s + (r.ページ || 0), 0).toLocaleString()}<small>ページ</small></div></div>
       <div class="数字"></div>
@@ -911,19 +939,19 @@ async function 管理の頁(){
   const 列 = document.getElementById("申請の列");
   if(!列) return;
   if(!申請ら) return 列.innerHTML = `<p class="誤りの字">申請を読めませんでした。</p>`;
-  if(!申請ら.length) return 列.innerHTML = `<p class="注" style="margin-top:24px">いま、申請はありません。</p>`;
+  if(!申請ら.length) return 列.innerHTML = `<p class="注 離れて">いま、申請はありません。</p>`;
   列.innerHTML = `<div class="申請の列">${申請ら.map(b=>`
     <div class="申請">
       <div class="申請の素性">申請：${逃(状態.人々.get(b.申請者)?.名 || "（ユーザ名なし）")}
         ${b.申請日 ? `／${日時に(b.申請日)}` : ""}${b.isbn ? `／ISBN ${逃(b.isbn)}` : ""}${b.ひとこと ? `／「${逃(b.ひとこと)}」` : ""}</div>
-      <label class="名札">書籍名</label><input class="欄" id="管題-${逃(b.id)}" maxlength="120" value="${逃(b.題)}">
-      <label class="名札">著者名</label><input class="欄" id="管著-${逃(b.id)}" maxlength="80" value="${逃(b.著)}">
-      <label class="名札">出版社名</label><input class="欄" id="管版元-${逃(b.id)}" maxlength="80" value="${逃(b.版元)}">
-      <label class="名札">ページ数（わかれば。読了のときに入っておく）</label><input class="欄" id="管ページ-${逃(b.id)}" type="number" inputmode="numeric" min="0" max="20000" value="${b.ページ || ""}">
-      ${b.isbn ? `<div class="釦たち" style="margin-top:10px">
+      <label class="名札" for="管題-${逃(b.id)}">書籍名</label><input class="欄" id="管題-${逃(b.id)}" maxlength="120" value="${逃(b.題)}">
+      <label class="名札" for="管著-${逃(b.id)}">著者名</label><input class="欄" id="管著-${逃(b.id)}" maxlength="80" value="${逃(b.著)}">
+      <label class="名札" for="管版元-${逃(b.id)}">出版社名</label><input class="欄" id="管版元-${逃(b.id)}" maxlength="80" value="${逃(b.版元)}">
+      <label class="名札" for="管ページ-${逃(b.id)}">ページ数（わかれば。読了のときに入っておく）</label><input class="欄" id="管ページ-${逃(b.id)}" type="number" inputmode="numeric" min="0" max="20000" value="${b.ページ || ""}">
+      ${b.isbn ? `<div class="釦たち 上の間">
         <button class="釦 枠だけ 小" data-する="書誌を引き直す" data-本="${逃(b.id)}" data-isbn="${逃(b.isbn)}">ISBN から書誌を引き直す</button></div>
         <div id="管確認-${逃(b.id)}"></div>` : ""}
-      <div class="釦たち" style="margin-top:14px">
+      <div class="釦たち 上の間">
         <button class="釦 小" data-する="申請を承認" data-本="${逃(b.id)}">本登録にする</button>
         <button class="釦 小 枠だけ" data-する="申請を見送る" data-本="${逃(b.id)}">見送る</button>
       </div>
@@ -963,38 +991,38 @@ function 自分の頁(){
   画面.innerHTML = `
   <section class="幕">
     <p class="英字の札">Me</p>
-    <div style="display:flex;gap:22px;align-items:center">
+    <div class="自分の頭">
       ${顔の絵(自分, "大")}
-      <div><h1 class="中見出し" style="margin:0">${逃(自分.名)}</h1>
-        <p class="注" style="margin:4px 0 0">${逃(状態.私.メール)}</p></div>
+      <div><h1 class="中見出し">${逃(自分.名)}</h1>
+        <p class="注">${逃(状態.私.メール)}</p></div>
     </div>
   </section>
   <section class="節 帳">
     <div class="節の頭"><h2 class="節見出し">ユーザ名</h2></div>
-    <input id="名の欄" class="欄" maxlength="20" value="${逃(自分.名)}" style="margin-top:14px">
-    <div class="釦たち" style="margin-top:16px"><button class="釦 小" data-する="名を直す">ユーザ名を直す</button></div>
+    <input id="名の欄" class="欄" maxlength="20" value="${逃(自分.名)}" aria-label="ユーザ名">
+    <div class="釦たち 上の間"><button class="釦 小" data-する="名を直す">ユーザ名を直す</button></div>
   </section>
   <section class="節">
     <div class="節の頭"><h2 class="節見出し">アバター</h2><p class="節の添え">作り直せるのは1日5回まで</p></div>
     ${三枚(a)}
-    <div class="釦たち" style="margin-top:16px">
+    <div class="釦たち 上の間">
       <button class="釦 枠だけ 小" data-する="向きを反対にする">向きを反対にする</button>
     </div>
     <p class="注">場所ごとに、決まった方を向いて座ります。奥の席で逆を向いていたら押してください。</p>
-    ${a.背中 ? "" : `<div class="釦たち" style="margin-top:18px">
+    ${a.背中 ? "" : `<div class="釦たち 上の間">
       <button class="釦 枠だけ 小" data-する="背中を足す">背中のアバターを足す</button></div>
     <p class="注">手前の席では、テーブルに向かう背中が見えます。いまのアバターから背中だけを描きます（1分ほど。1日の回数に1回数えます）。</p>`}
     <div class="帳">
       ${写真の欄()}
       ${a.状態 === "failed" && a.誤り ? `<p class="誤りの字">${逃(a.誤り)}</p>` : ""}
-      <div class="釦たち" style="margin-top:24px">
-        <button class="釦 藤" data-する="作り直す">この写真で作り直す</button>
+      <div class="釦たち 上の広い間">
+        <button class="釦" data-する="作り直す">この写真で作り直す</button>
       </div>
     </div>
   </section>
   <section class="節">
     <div class="節の頭"><h2 class="節見出し">ログイン</h2></div>
-    <div class="釦たち" style="margin-top:16px"><button class="釦 枠だけ 小" data-する="出る">ログアウト</button></div>
+    <div class="釦たち 上の間"><button class="釦 枠だけ 小" data-する="出る">ログアウト</button></div>
   </section>`;
   絵を入れる(画面);
 }
@@ -1072,7 +1100,11 @@ const 動き = {
   本を選ぶ: el=>{
     本窓.選んだ = 本窓.本ら.find(b=>b.id === el.dataset.本) || null;
     // 窓ごと描き直さない（欄の文字も、一覧の位置もそのまま）。印と「選んでいる本」だけを直す
-    document.querySelectorAll(".本の候補の札").forEach(b=>b.classList.toggle("いま", b.dataset.本 === 本窓.選んだ?.id));
+    document.querySelectorAll(".本の候補の札").forEach(b=>{
+      const いま = b.dataset.本 === 本窓.選んだ?.id;
+      b.classList.toggle("いま", いま);
+      b.querySelector(".本の候補の字")?.setAttribute("aria-pressed", String(いま));
+    });
     本窓.候補の控え = null;
     選んでいる本を描く();
   },
@@ -1202,11 +1234,13 @@ const 動き = {
       const アプリへ = "twitter://post?message=" + encodeURIComponent(投稿の文);
       窓を出す("X に投稿する", `
         <p class="窓の文">準備ができました。読んだ時間は記録に残しました。</p>
-        <a class="釦 藤 全幅 X釦" href="${逃(アプリへ)}" data-する="Xへ移る" data-戻るまで="1">X のアプリで投稿する</a>
-        ${navigator.share ? `<button class="釦 枠だけ 全幅 X釦" data-する="共有から投稿する">共有から投稿する（X を選ぶ）</button>` : ""}
+        <div class="窓の釦">
+          <a class="釦 全幅" href="${逃(アプリへ)}" data-する="Xへ移る" data-戻るまで="1">X のアプリで投稿する</a>
+          ${navigator.share ? `<button class="釦 枠だけ 全幅" data-する="共有から投稿する">共有から投稿する（X を選ぶ）</button>` : ""}
+          <button class="釦 枠だけ 全幅" data-する="投稿しないで閉じる">投稿しないで閉じる</button>
+        </div>
         <p class="注">アプリで開かないときは、「共有から投稿する」で X を選んでください。X のアプリが無いときは、
-          <a href="${逃(先)}" data-する="Xへ移る">ブラウザの X で投稿する</a>。</p>
-        <button class="釦 枠だけ 全幅" data-する="投稿しないで閉じる">投稿しないで閉じる</button>`);
+          <a href="${逃(先)}" data-する="Xへ移る">ブラウザの X で投稿する</a>。</p>`, { 閉じられない:true });
       return;
     }
     if(窓){ 窓.opener = null; 窓.location.href = 先; }
@@ -1247,9 +1281,9 @@ function 読み終える窓(){
     </div>
     <div class="共有の見本" id="共有の見本">${待ちの画面("絵を描いています")}</div>
     <p class="窓の文">X に投稿しますか？</p>
-    <div class="釦たち" style="margin-top:12px">
-      <button class="釦 藤" data-する="投稿して終える" disabled>X に投稿して終える</button>
-      <button class="釦 枠だけ" data-する="そのまま終える">投稿しないで終える</button>
+    <div class="窓の釦">
+      <button class="釦 全幅" data-する="投稿して終える" disabled>X に投稿して終える</button>
+      <button class="釦 枠だけ 全幅" data-する="そのまま終える">投稿しないで終える</button>
     </div>
     <p class="注">投稿には、この絵と、書籍名と、読んだ時間が入ります。絵には、その場にいる人のユーザ名と書籍名も写ります。</p>`);
   共有の絵を描く(題, 分, 場所).then(絵=>{
