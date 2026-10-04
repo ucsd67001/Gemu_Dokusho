@@ -113,6 +113,55 @@ const ベンチら = {
 };
 
 const 部屋 = process.argv[2];
+
+/* ── 広げる：いまの絵の構図はそのままに、ベンチを置く広場だけを広げる（2026-10-04 配信者「ベンチの位置が近すぎるので、
+   もう少しゆとりをもって配置できるように、ベンチを置くスペースを広げたい」）。
+     node 04_tools/部屋を作る.mjs owakudani 2 --広げる
+   いまの public/部屋/{部屋}.webp を OpenAI の images/edits に渡し、広場のことだけを頼む */
+const 広げ方 = {
+  owakudani: "the flat stone-paved viewing terrace in the front",
+  ashinoko: "the flat stone-paved lakeside terrace in the front",
+};
+if(process.argv.includes("--広げる")){
+  if(!広げ方[部屋]){ console.error(`広げられる場所：${Object.keys(広げ方).join(" / ")}`); process.exit(1); }
+  const 枚数 = Math.min(4, Math.max(1, Number(process.argv[3]) || 2));
+  const 鍵 = execSync("firebase functions:secrets:access OPENAI_API_KEY --project gemu-dokusho",
+    { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  const 元 = await sharp(join(ここ, "../public/部屋", `${部屋}.webp`)).png().toBuffer();
+  const 指示 = [
+    "Edit this isometric diorama illustration.",
+    "Keep the SAME overall composition, camera angle, art style, colors, lighting and every existing landmark and object exactly as they are.",
+    `ONLY change one thing: make ${広げ方[部屋]} clearly larger — about twice its current area —`,
+    "extending it wider to the left and right and a little deeper toward the viewer, so that four small two-person benches",
+    "could later be placed on it with generous empty space between them. The diorama block may become slightly larger to fit it.",
+    "Keep the terrace completely EMPTY: no benches, no chairs, no stools, no people, no animals, no text.",
+  ].join(" ");
+  const 書式 = new FormData();
+  書式.append("model", process.env.IMAGE_MODEL || "gpt-image-1");
+  書式.append("image", new Blob([元], { type: "image/png" }), `${部屋}.png`);
+  書式.append("prompt", 指示);
+  書式.append("n", String(枚数));
+  書式.append("size", "1536x1024");
+  書式.append("quality", "high");
+  console.log(`${部屋} の広場を広げた絵を ${枚数} 枚作ります（1〜3分）…`);
+  const r = await fetch("https://api.openai.com/v1/images/edits", {
+    method: "POST", headers: { "Authorization": `Bearer ${鍵}` }, body: 書式,
+  });
+  const j = await r.json();
+  if(!r.ok){ console.error("作れませんでした：", j?.error?.message || r.status); process.exit(1); }
+  const 置き場 = join(ここ, "下書き");
+  mkdirSync(置き場, { recursive: true });
+  const 時 = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 12);
+  for(const [i, d] of j.data.entries()){
+    const png = Buffer.from(d.b64_json, "base64");
+    const 名 = `${部屋}_広げた_${時}_${i + 1}`;
+    writeFileSync(join(置き場, 名 + ".png"), png);
+    await sharp(png).webp({ quality: 86 }).toFile(join(置き場, 名 + ".webp"));
+    console.log("できました：", join("04_tools", "下書き", 名 + ".webp"));
+  }
+  process.exit(0);
+}
+
 if(部屋 === "bench"){
   const 鍵 = execSync("firebase functions:secrets:access OPENAI_API_KEY --project gemu-dokusho",
     { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
