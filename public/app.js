@@ -90,6 +90,7 @@ function 道を読む(){
 
 function 行く(頁, 履歴に積む = true){
   if(状態.頁 === "部屋" && 頁 !== "部屋") 土台.立つ().catch(()=>{});
+  窓を閉じる();   // ページを移ったら、前のページの小さな画面は閉じる（ほかのページに残らないように）
   状態.頁 = 頁;
   const 道 = 頁 === "部屋" ? `/room/${状態.部屋}` : (頁の道[頁] ?? "");
   if(履歴に積む) history.pushState({}, "", 根 + 道 || "/");
@@ -312,7 +313,7 @@ async function 本のランキングを描く(本){
       ${本ら.length ? 本ら.map((x, i)=>`<div class="読み方の人">
         <span class="順位">${i + 1}</span>
         ${表紙(表.引く(x.本, x.題))}
-        <span class="名 書籍名">『${逃(x.題)}』</span><span class="数">${単位(x.数)}</span></div>`).join("")
+        <span class="名 書籍名">${書籍名(表.引く(x.本, x.題), x.題)}</span><span class="数">${単位(x.数)}</span></div>`).join("")
         : `<p class="注">まだありません</p>`}
     </div>`;
   置き場.innerHTML =
@@ -388,9 +389,13 @@ function 部屋の頁(){
     }
     // 席を合わせたあと（開き直したときなど）も、長く離れていたかを確かめる
     if(土台.座っている()) 戻りを確かめる({ 聞くだけ:true });
+    /* ⚠️ 「最初の様子」は、座っていてもいなくても、最初の1回で使い切る（2026-10-04）。
+       前は座っているときに使い切らず、座ったまま開き直してから読み終えると、席が空いた瞬間に
+       「はじめて入った人」と取り違えて「いま読む本」の画面を出し、移った先のページ（記録など）に残っていた */
+    const 最初 = 初めて;
+    初めて = false;
     if(土台.座っている()) return;
-    if(初めて){
-      初めて = false;
+    if(最初){
       if(!満席か()) 題の窓("席に着く");
     }else if(前は満席 && !満席か()){
       知らせる("ベンチがひとつ空きました");
@@ -576,7 +581,7 @@ function 手もとを描く(){
   el.innerHTML = `<div class="手もと">
     ${顔の絵(状態.自分, "中")}
     ${題 ? 表紙(本, "中") : ""}
-    <div class="何を"><div class="書名">${題 ? `『${逃(題)}』` : "書籍名は出していません"}</div>
+    <div class="何を"><div class="書名">${題 ? 書籍名(本, 題) : "書籍名は出していません"}</div>
       <div class="時">読んだ時間 ${分に(土台.読んだ時間())}</div></div>
     <div class="釦たち">
       <button class="釦 枠だけ 小" data-する="本を替える">本を替える</button>
@@ -608,6 +613,13 @@ function 表紙(本, 大きさ = "小"){
   if(!道) return `<span class="表紙 ${大きさ}" aria-hidden="true"></span>`;
   return `<a class="表紙 ${大きさ}" href="${逃(道.リンク)}" target="_blank" rel="noopener sponsored" title="Amazon で見る">`
     + `<img class="表紙の絵" src="${逃(道.表紙)}" alt="" loading="lazy"></a>`;
+}
+/* 書籍名の文字にも、表紙と同じ Amazon のリンクを付ける（2026-10-04 配信者「表紙だけでなく、書籍名にも」）。
+   ASIN の無い本は文字のまま。⚠️ いま読む本を選ぶところでは付けない（書籍名を押すと本を選ぶため。表紙からは開ける） */
+function 書籍名(本, 題){
+  const 字 = `『${逃(題)}』`;
+  const 道 = 本 ? Amazonの道(本) : null;
+  return 道 ? `<a class="書籍名のリンク" href="${逃(道.リンク)}" target="_blank" rel="noopener sponsored" title="Amazon で見る">${字}</a>` : 字;
 }
 document.addEventListener("load", e=>{
   const el = e.target;
@@ -866,7 +878,7 @@ async function 記録の頁(){
       <div class="記録の列">
         ${記録.length ? 記録.map(r=>`<div class="記録">
           <span class="日">${日付(r.始め)}</span>
-          <span class="題">${表紙(表.引く(r.本, r.題))}<span>『${逃(r.題)}』</span></span>
+          <span class="題">${表紙(表.引く(r.本, r.題))}<span>${書籍名(表.引く(r.本, r.題), r.題)}</span></span>
           <span class="分">${分に(長さ(r))}</span></div>`).join("")
           : `<p class="注">まだありません。ベンチに座ると、ここに残ります。</p>`}
       </div>

@@ -371,6 +371,10 @@ a.釦.X釦 + .注{margin-bottom:14px}
 .表紙.中{width:38px;height:54px}
 .表紙 img{display:block;width:100%;height:100%;object-fit:cover}
 a.表紙:hover{box-shadow:0 0 0 2px var(--灯)}
+/* 書籍名の Amazon のリンク：字の色はそのまま、細い下線だけ。触れたら差し色 */
+a.書籍名のリンク{color:inherit;text-decoration:underline;text-decoration-color:var(--罫の濃い);
+  text-decoration-thickness:1px;text-underline-offset:3px}
+a.書籍名のリンク:hover{color:var(--灯の濃い);text-decoration-color:currentColor}
 
 .裾{margin-top:72px;padding:22px 0 40px;border-top:1px solid var(--罫);
   font-family:var(--ゴシック);font-size:11px;color:var(--字のごく薄い);letter-spacing:.04em;
