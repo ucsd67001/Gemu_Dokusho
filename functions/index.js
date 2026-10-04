@@ -381,7 +381,7 @@ export const readerStats = onCall({ region: "asia-northeast1" }, async req => {
   const 本に足す = (x, k, v) => {
     if(!x.title || x.title === 題を出さない印) return;
     const 鍵 = x.book || "t:" + x.title;
-    const y = 本の計.get(鍵) || { title: x.title, finishes: 0, pages: 0, minutes: 0 };
+    const y = 本の計.get(鍵) || { title: x.title, book: x.book || "", finishes: 0, pages: 0, minutes: 0 };
     y[k] += v;
     本の計.set(鍵, y);
   };
@@ -399,7 +399,7 @@ export const readerStats = onCall({ region: "asia-northeast1" }, async req => {
   });
   const 本の上位 = k => [...本の計.values()].filter(v => Math.round(v[k]) > 0)
     .sort((a, b) => b[k] - a[k]).slice(0, 3)
-    .map(v => ({ title: v.title, value: Math.round(v[k]) }));
+    .map(v => ({ title: v.title, book: v.book, value: Math.round(v[k]) }));   // book は表紙を出すため（2026-10-04）
   const 人 = new Map(users.docs.map(d => [d.id, d.data()]));
   const 上位 = k => [...計].filter(([uid, v]) => Math.round(v[k]) > 0 && 人.has(uid))
     .sort((a, b) => b[1][k] - a[1][k]).slice(0, 3)

@@ -217,7 +217,7 @@ export async function 立つ({ 記録する = false, 読了 = null } = {}){
     いま.区切り.forEach((k, i)=>{
       for(const [a, b] of 休みを引く(k.始め, いま.区切り[i + 1]?.始め ?? 終わり, いま.休み))
         s.記録.push({ id:Math.random().toString(36).slice(2), uid:私.uid, 部屋:いま.部屋, 題:k.題 || 題を出さない印,
-          始め:a, 終わり:b });
+          ...(k.本 ? { 本:k.本 } : {}), 始め:a, 終わり:b });
     });
   }
   if(s.席[いま.部屋]?.[いま.番]?.uid === 私?.uid) delete s.席[いま.部屋][いま.番];
@@ -332,7 +332,7 @@ export async function 読み方を読む(){
 export async function 記録を読む(){
   return 読む().記録.filter(x=>x.uid === 私.uid)
     .sort((a, b)=>b.始め - a.始め)
-    .map(({ 部屋, 題, 始め, 終わり })=>({ 部屋, 題, 始め, 終わり }));
+    .map(({ 部屋, 題, 本, 始め, 終わり })=>({ 部屋, 題, 本:本 || "", 始め, 終わり }));
 }
 
 /* ── ブロックの仮の絵 ───────────────────────────

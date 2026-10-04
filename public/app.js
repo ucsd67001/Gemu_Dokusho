@@ -13,7 +13,7 @@
    ============================================================ */
 
 import { 部屋ら, 部屋の絵, 出す部屋ら, 最初の部屋 } from "./部屋.js";
-import { AmazonのASIN, ISBN13にする, ISBNで確かめる } from "./書誌.js";
+import { AmazonのASIN, ISBN13にする, ISBNで確かめる, Amazonの道 } from "./書誌.js";
 
 const 試しか = location.pathname === "/demo" || location.pathname.startsWith("/demo/");
 const 土台 = await import(試しか ? "./試し/土台.js" : "./土台.js");
@@ -300,16 +300,18 @@ function 廊下(){
 /* ベンチでひらかれた本（2026-10-01 配信者「本を起点として、読了の数、読まれたページの数、読まれた時間で」。
    最初は「本のランキング」と呼んでいたが、同じ日にコンセプトに合わせてこの名前にした。順位の数字は残す）。
    「読み方は、人それぞれ」と同じ3列の形。本は順位つき（人のほうは順位を付けない）。だれが読んだかは出さない */
-function 本のランキングを描く(本){
+async function 本のランキングを描く(本){
   const 置き場 = document.getElementById("本のランキング");
   if(!置き場) return;
   if(!本) return 置き場.innerHTML = `<p class="注">いまは数えられませんでした。</p>`;
+  const 表 = await 本の表();
   const 時間に = 分 => 分 >= 60 ? `${Math.floor(分 / 60)}時間${分 % 60 ? (分 % 60) + "分" : ""}` : `${分}分`;
   const 列 = (見出し, 本ら, 単位) => `
     <div class="読み方の列">
       <h3>${見出し}</h3>
       ${本ら.length ? 本ら.map((x, i)=>`<div class="読み方の人">
         <span class="順位">${i + 1}</span>
+        ${表紙(表.引く(x.本, x.題))}
         <span class="名 書籍名">『${逃(x.題)}』</span><span class="数">${単位(x.数)}</span></div>`).join("")
         : `<p class="注">まだありません</p>`}
     </div>`;
@@ -411,6 +413,7 @@ function 部屋の頁(){
   }, 3500);
   // 1分ごとに「まだいます」を送る。読んだ時間の表示も直す
   const 生きる = setInterval(()=>戻りを確かめる(), 60000);
+  本の表().then(()=>{ if(状態.頁 === "部屋") 手もとを描く(); });   // 読んでいる本の表紙
   const 時計 = setInterval(手もとを描く, 30000);
   片づけ.push(()=>{ clearInterval(めくり); clearInterval(生きる); clearInterval(時計); });
 
@@ -566,8 +569,11 @@ function 手もとを描く(){
     return;
   }
   const 題 = 状態.席ら.find(s=>s.uid === 状態.私.uid)?.題 ?? "";
+  // 書籍名を出しているときだけ、表紙も出す
+  const 本 = 題 ? 本の表の今.引く(状態.席ら.find(s=>s.uid === 状態.私.uid)?.本 || 席.区切り?.at(-1)?.本, 題) : null;
   el.innerHTML = `<div class="手もと">
     ${顔の絵(状態.自分, "中")}
+    ${題 ? 表紙(本, "中") : ""}
     <div class="何を"><div class="書名">${題 ? `『${逃(題)}』` : "書籍名は出していません"}</div>
       <div class="時">読んだ時間 ${分に(土台.読んだ時間())}</div></div>
     <div class="釦たち">
@@ -589,6 +595,38 @@ const 前の本 = () =>{ try{ return localStorage.getItem("gemuの前の本") ||
 // 読了した本は、次の「いま読む本」の画面で選んだ状態にしない
 const 前の本を忘れる = () =>{ try{ localStorage.removeItem("gemuの前の本"); }catch{} };
 const 本の見出し = b => [b.著, b.版元].filter(Boolean).join("／") + (b.状態 === "仮登録" ? "（仮登録）" : "");
+
+/* ⚠️⚠️ 本の表紙（2026-10-04 配信者「本も表紙を小さく出したい。Hongaeshi のように Amazon のリンクを活用して」）。
+   出すのは4か所：ベンチでひらかれた本／いま読む本を選ぶところ／読んでいる本（場所の下）／記録のページ。
+   **表紙は必ず Amazon のリンク（アフィリエイトのタグ付き）と一緒に出す**（規約上グレーな直リンクなので。書誌.js の注）。
+   押すと Amazon の本のページが新しいタブで開く。ASIN の無い本は、無地の背表紙だけ（リンクも無し）。
+   表紙が無い本（Amazon が 1×1 の絵を返す）は、絵を外して無地にする（下の load / error を見張るところ） */
+function 表紙(本, 大きさ = "小"){
+  const 道 = 本 ? Amazonの道(本) : null;
+  if(!道) return `<span class="表紙 ${大きさ}" aria-hidden="true"></span>`;
+  return `<a class="表紙 ${大きさ}" href="${逃(道.リンク)}" target="_blank" rel="noopener sponsored" title="Amazon で見る">`
+    + `<img class="表紙の絵" src="${逃(道.表紙)}" alt="" loading="lazy"></a>`;
+}
+document.addEventListener("load", e=>{
+  const el = e.target;
+  if(el.classList?.contains("表紙の絵") && (el.naturalWidth <= 2 || el.naturalHeight <= 2)) el.remove();
+}, true);
+document.addEventListener("error", e=>{ if(e.target.classList?.contains("表紙の絵")) e.target.remove(); }, true);
+
+/* 本の id（無ければ書籍名）から本を引く。記録・ランキング・場所の下で表紙を出すため。
+   本棚と本登録の本を一度だけ読んで覚えておく */
+let 本の表の約束 = null;
+function 本の表(){
+  本の表の約束 ||= 土台.本らを読む().then(本ら=>{
+    const id = new Map(本ら.map(b=>[b.id, b]));
+    const 題 = new Map();
+    for(const b of 本ら) if(!題.has(b.題)) 題.set(b.題, b);
+    return 本の表の今 = { 引く:(本, 書籍名)=>id.get(本) || 題.get(書籍名) || null };
+  }).catch(()=>({ 引く:()=>null }));
+  return 本の表の約束;
+}
+// 読めたあとの表（場所の下は、待たずに描くので。部屋の頁で読み終えたら描き直す）
+let 本の表の今 = { 引く:()=>null };
 
 async function 題の窓(やること){
   const w = 本窓 = { やること, 出す:true, 本ら:null, 選んだ:null, 探す:"", 申請:false, 送信中:false };
@@ -619,8 +657,11 @@ function 本の候補(){
   if(w.本ら === null) return 待ちの画面("本棚を読んでいます");
   const 候補 = 絞った本ら();
   if(!候補.length) return `<p class="注">見つかりません。</p>`;
-  return 候補.map(b=>`<button class="本の候補の札 ${w.選んだ?.id === b.id ? "いま" : ""}" data-する="本を選ぶ" data-本="${逃(b.id)}">
-    <b>『${逃(b.題)}』</b><span>${逃(本の見出し(b))}</span></button>`).join("");
+  // ⚠️ 表紙は Amazon へのリンクなので、選ぶ釦の中には入れられない（釦の中にリンクを置けない）。札を div にして横に並べる
+  return 候補.map(b=>`<div class="本の候補の札 ${w.選んだ?.id === b.id ? "いま" : ""}" data-本="${逃(b.id)}">
+    ${表紙(b)}
+    <button class="本の候補の字" data-する="本を選ぶ" data-本="${逃(b.id)}">
+      <b>『${逃(b.題)}』</b><span>${逃(本の見出し(b))}</span></button></div>`).join("");
 }
 
 function 本の窓を描く(){
@@ -788,7 +829,8 @@ async function 記録の頁(){
   </section>`;
   let 記録;
   let 読了ら = [];
-  try{ [記録, 読了ら] = await Promise.all([土台.記録を読む(), 土台.読了を読む().catch(()=>[])]); }
+  let 表 = { 引く:()=>null };
+  try{ [記録, 読了ら, 表] = await Promise.all([土台.記録を読む(), 土台.読了を読む().catch(()=>[]), 本の表()]); }
   catch(e){ console.error(e); 記録 = null; }
   const 中 = document.getElementById("記録の中");
   if(!中) return;
@@ -822,7 +864,7 @@ async function 記録の頁(){
       <div class="記録の列">
         ${記録.length ? 記録.map(r=>`<div class="記録">
           <span class="日">${日付(r.始め)}</span>
-          <span class="題">『${逃(r.題)}』</span>
+          <span class="題">${表紙(表.引く(r.本, r.題))}<span>『${逃(r.題)}』</span></span>
           <span class="分">${分に(長さ(r))}</span></div>`).join("")
           : `<p class="注">まだありません。ベンチに座ると、ここに残ります。</p>`}
       </div>

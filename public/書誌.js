@@ -26,6 +26,39 @@ export function ISBN13にする(isbn){
   return 体 + String((10 - (和 % 10)) % 10);
 }
 
+/* ============================================================
+   Amazon のリンクと表紙（2026-10-04 配信者「本も表紙を小さく出したい。Hongaeshi のように Amazon のリンクを活用して」）
+
+   Hongaeshi の 共通.js の Amazonの表紙・Amazonのリンク と同じ作り。タグも同じ（配信者が「タグ付きで」を選んだ）。
+   ⚠️⚠️ **表紙の直リンク（images/P/{ASIN}）は、Amazon アソシエイトの規約上グレー。承知のうえで使っている。**
+      規約は商品画像を PA-API から取ることを求めている。Hongaeshi と同じく、
+      **表紙は必ずアフィリエイトのリンクと一緒に出す**（app.js の 表紙）。リンクの無いところに表紙だけを出さない。
+   ⚠️ サイトの下に「Amazon アソシエイト・プログラムの参加者です」の表示が要る（index.html・demo.html の裾）
+   ・ASIN は、Hongaeshi で設定したリンクのもの（本棚.json の asin）を先に使い、無ければ ISBN-10（紙の本は ASIN と同じ）
+   ・Kindle だけの本など、ISBN の無い本には出さない
+   ・**Amazon は、表紙が無くても 1×1 の透明な絵を返す**（読めたかどうかでは分からない）→ 出たところの大きさで見る
+   ============================================================ */
+export const アソシエイトタグ = "ucsd67001-22";
+
+export function ISBN10にする(isbn){
+  const d = String(isbn || "").replace(/[^0-9Xx]/g, "");
+  if(/^[0-9]{9}[0-9Xx]$/.test(d)) return d.toUpperCase();
+  if(!/^978[0-9]{10}$/.test(d)) return null;   // 979 は ISBN-10 に直せない
+  const 体 = d.slice(3, 12);
+  let 和 = 0;
+  for(let i = 0; i < 9; i++) 和 += Number(体[i]) * (10 - i);
+  const 余 = 11 - (和 % 11);
+  return 体 + (余 === 11 ? "0" : 余 === 10 ? "X" : String(余));
+}
+
+// 本 → { リンク, 表紙 } か null
+export function Amazonの道(本){
+  const a = (/^[0-9A-Z]{10}$/.test(本?.asin || "") ? 本.asin : null) || ISBN10にする(本?.isbn);
+  if(!a) return null;
+  return { リンク:`https://www.amazon.co.jp/dp/${a}?tag=${アソシエイトタグ}`,
+    表紙:`https://m.media-amazon.com/images/P/${a}.01._SCLZZZZZZZ_.jpg` };
+}
+
 function 著者を読めるように(文字列){
   const 人ら = 著者をばらす(文字列 || "");
   if(!人ら.length) return 文字列 || "";

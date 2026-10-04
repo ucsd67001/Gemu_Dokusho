@@ -397,7 +397,7 @@ export async function 短縮リンクを辿る(url){
 export async function 読み方を読む(){
   const r = (await httpsCallable(呼ぶ, "readerStats", { timeout: 30000 })({})).data || {};
   const 直す = xs => (xs || []).map(x=>({ uid:x.uid, 名:x.name, 顔:x.face, 数:x.value }));
-  const 本の直す = xs => (xs || []).map(x=>({ 題:x.title, 数:x.value }));
+  const 本の直す = xs => (xs || []).map(x=>({ 題:x.title, 本:x.book || "", 数:x.value }));
   const 本 = r.bookRank || {};
   return { 冊:直す(r.books), ページ:直す(r.pages), 分:直す(r.minutes),
     本:{ 読了:本の直す(本.finishes), ページ:本の直す(本.pages), 分:本の直す(本.minutes) } };
@@ -408,7 +408,7 @@ export async function 記録を読む(){
     where("uid", "==", 私.uid), orderBy("from", "desc"), limit(200)));
   return s.docs.map(d=>{
     const x = d.data();
-    return { 部屋:x.room, 題:x.title,
+    return { 部屋:x.room, 題:x.title, 本:x.book || "",
       始め:x.from?.toMillis?.() || 0, 終わり:x.to?.toMillis?.() || 0 };
   });
 }
