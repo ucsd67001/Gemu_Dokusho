@@ -1,40 +1,45 @@
 /* ============================================================
    GEMuの静かな読書会 ― 裏の処理
 
-   いまあるのは3つ：
-     makeAvatar  写真から、ブロック風のアバターを4枚作る
-                 ① 椅子ごと座って本を読む姿（sit）……奥の席で使う（顔がこちらを向く）
-                 ② 同じ姿で、ページをめくっているところ（turn）
+   いまあるのは8つ：
+     makeAvatar  写真から、ブロック風のアバターを3枚作る
+                 ① ベンチごと座って本を読むアバター（sit）……顔がこちらを向く席で使う
+                 ② 同じアバターで、ページをめくっているところ（turn）
                  ③ 顔のアイコン（face）
-                 ④ 同じ人を、後ろから見た姿（back）……手前の席で使う（テーブルに向くと背中がこちらを向く）
-                 部屋では ①と② を交互に出して、読んでいるように見せる
-     addBack     ④が無いアバター（④を足す前に作ったもの）に、④だけを足す
-     detectFacing  できているアバター（座る姿）が、左右どちらを向いているかを見て記録する
+                 場所の絵では ①と② を交互に出して、読んでいるように見せる
+                 ⚠️ 2026-10-10 配信者：④ 後ろから見たアバター（back）は**作らない**ことにした。
+                    背中を使うのは「手前の席」（背中がこちらを向く席）だけで、いまの場所（ローテンブルク・大涌谷・芦ノ湖）には無い。
+                    使われない絵に料金の約4分の1を払っていた。手前の席のある場所を足すときは、addBack と画面の「背中を足す」を戻す
+     addBack     ④ だけを足す（いまは画面から呼ばない。手前の席のある場所を足すときのために残す）
+     detectFacing  できているアバター（座る絵）が、左右どちらを向いているかを見て記録する
                    （向きを記録する前に作ったアバターのため。画面が一度だけ呼ぶ）
      borrowImages  アバターの絵を data URL で返す（読み終えたときの X 用の絵を、画面の canvas で描くため）
      sharePage     読書の記録ページ /s/{id}。X がリンクから絵（og:image）を読み取って、投稿に大きく出す
      resolveAmazonLink  Amazon の短縮リンク（amzn.asia など）の飛び先を辿って、商品のリンクを返す（本の申請の入力補助）
+     cleanShares   毎日4時（日本）に、作ってから1週間たった読書の記録ページ（shares と、その絵）を消す（2026-10-10 配信者）
      readerStats   「読み方は、人それぞれ」：読了した冊数・読了した本の総ページ数・読んだ時間の、それぞれ上位3人。
                    あわせて「本のランキング」：本ごとの読了の数・読まれたページの数・読まれた時間の、それぞれ上位3冊
 
    ⚠️⚠️ **写真はどこにも残さない。**受け取って OpenAI に渡すだけ。
       残すのは出来上がった絵（Storage の avatars/{uid}/{版}/）だけ。
-   ⚠️ ②③④は、写真からではなく **①から作る。**写真から何回も作ると、
+   ⚠️ ②③（と④）は、写真からではなく **①から作る。**写真から何回も作ると、
       別人になる（顔も服も毎回変わる）。
-   ⚠️ 席は4つ。テーブルの左右×奥と手前。左右は反転で作れるので、要るのは「顔の向き」と「背中の向き」の2つだけ。
+   ⚠️ 席の向きは、右向きと左向き。左右は画面で反転して作るので、要るのは「顔の向き」の1枚だけ。
    ⚠️ 座るものごと描かせるのは、背景の椅子に重ねると、向きと高さがずれて浮いて見えるため。
    ⚠️ 座るものは**小さな木のベンチ**（2026-09-27、カフェの椅子から替えた）。場所が観光地の広場・公園・川べりに
       なっても合うように。空いている席に置く空のベンチ（04_tools/部屋を作る.mjs bench）と、言い方をそろえる
    ⚠️⚠️ **「右前を向く」と頼んでも、左を向いて描かれることがある**（2026-09-27、配信者の一枚目がそうだった）。
       → 描いたあとに、左右どちらを向いているかを見る（avatar.facing＝"left"/"right"）。
-        部屋では、席の「テーブルの方向」と違えば左右を反転する。見分けを間違えたら、本人が「自分」で反対にできる（users.flip）。
-   ⚠️ 1人1日5回まで、**全員あわせて1日30回まで**（日本の日付で数える）。1回で絵を4枚作るので、料金はその4倍。
+        場所の絵では、席の向きと違えば左右を反転する。見分けを間違えたら、本人が「自分のページ」で反対にできる（users.flip）。
+   ⚠️ 1人1日5回まで、**全員あわせて1日30回まで**（日本の日付で数える）。1回で絵を3枚作り、向きの見分けを1回する。
       ④だけを足す（addBack）のも1回に数える。
       だれでもログインして登録できる形にしたので、全員ぶんの上限が料金の歯止め（meta/usage）。
 
    鍵：OPENAI_API_KEY は Secret Manager に置く（README「鍵」）。
    ============================================================ */
+import { setGlobalOptions } from "firebase-functions/v2";
 import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
@@ -44,6 +49,8 @@ import sharp from "sharp";
 
 initializeApp();
 const db = getFirestore();
+// ⚠️ どの処理も東京（asia-northeast1）。firebase.json の sharePage の rewrite も同じ場所を指す
+setGlobalOptions({ region: "asia-northeast1" });
 
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
 // ⚠️ 画像のモデルは、新しいものが出たら差し替えられるようにしておく（functions/.env に IMAGE_MODEL=…）
@@ -54,7 +61,7 @@ const 全員の一日の上限 = 30;   // 全員あわせて
 const 写真の上限 = 6 * 1024 * 1024;   // 画面で 1024px の JPEG に縮めてから送るので、ふつうは 0.3MB ほど
 
 /* ── 絵の指示 ──────────────────────────────
-   ⚠️ 部屋の背景は「明るい中世ヨーロッパのカフェ」を、斜め上から見た立体の絵。
+   ⚠️ 場所の絵は、どれも斜め上から見たミニチュアの立体（04_tools/部屋を作る.mjs）。
       アバターはそこに置くので、**同じ斜めの角度（右前を向く 3/4）**で描かせる。
       左向きの席では、画面で左右を反転する。 */
 /* ⚠️⚠️ **人の写真とは限らない。**キャラクターの絵を上げる人もいる（2026-09-27、二人目の方は黄色いキャラクターの絵で、
@@ -109,13 +116,11 @@ const 背中の指示 =
 
 /* ── 呼び出し ─────────────────────────────── */
 export const makeAvatar = onCall({
-  region: "asia-northeast1",
   secrets: [OPENAI_API_KEY],
   timeoutSeconds: 540,
   memory: "1GiB",
 }, async req => {
-  const 私 = req.auth;
-  if(!私) throw new HttpsError("unauthenticated", "ログインしてください");
+  const 私 = ログインした人(req);
 
   const 写真 = 写真をほどく(req.data?.photo);
   const 利用者 = db.doc(`users/${私.uid}`);
@@ -127,26 +132,24 @@ export const makeAvatar = onCall({
   try{
     const ai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
     const 座る = await 描く(ai, 写真, "photo.jpg", "image/jpeg", 座る指示);
-    await 進み("ページをめくるところ・背中・顔を描いています（2/3）");
+    await 進み("ページをめくるところと顔を描いています（2/3）");
     const 向きの約束 = 向きを見る(ai, 座る, "image/png");
-    const [めくる, 顔, 背中] = await Promise.all([
+    // ⚠️ 背中（④）は作らない（2026-10-10 配信者。いまの場所に手前の席が無いため。上の説明）
+    const [めくる, 顔] = await Promise.all([
       描く(ai, 座る, "sit.png", "image/png", めくる指示),
       描く(ai, 座る, "sit.png", "image/png", 顔の指示),
-      描く(ai, 座る, "sit.png", "image/png", 背中の指示),
     ]);
     await 進み("仕上げています（3/3）");
 
     const 版 = Date.now().toString(36);
-    const [sit, turn, face, back, facing, backFacing] = await Promise.all([
+    const [sit, turn, face, facing] = await Promise.all([
       置く(私.uid, 版, "sit", 座る, 640),
       置く(私.uid, 版, "turn", めくる, 640),
       置く(私.uid, 版, "face", 顔, 256),
-      置く(私.uid, 版, "back", 背中, 640),
       向きの約束,
-      背中の向きを見る(ai, 背中, "image/png"),
     ]);
     await 利用者.set({ avatar: {
-      status: "ready", step: FieldValue.delete(), sit, turn, face, back, facing, backFacing,
+      status: "ready", step: FieldValue.delete(), sit, turn, face, facing,
       at: FieldValue.serverTimestamp()
     }, flip: false }, { merge: true });
     await 古い版を消す(私.uid, 版);
@@ -161,12 +164,11 @@ export const makeAvatar = onCall({
 
 /* ── 背中だけを足す ─────────────────────────── */
 export const addBack = onCall({
-  region: "asia-northeast1",
   secrets: [OPENAI_API_KEY],
   timeoutSeconds: 300,
   memory: "1GiB",
 }, async req => {
-  if(!req.auth) throw new HttpsError("unauthenticated", "ログインしてください");
+  ログインした人(req);
   const 利用者 = db.doc(`users/${req.auth.uid}`);
   const a = (await 利用者.get()).data()?.avatar || {};
   if(!a.sit) throw new HttpsError("failed-precondition", "アバターがまだありません");
@@ -181,7 +183,7 @@ export const addBack = onCall({
     const 版 = a.sit.split("/")[2];   // avatars/{uid}/{版}/sit.webp。同じ版に置く（古い版を消すときに残るように）
     const [back, backFacing] = await Promise.all([
       置く(req.auth.uid, 版, "back", 背中, 640),
-      背中の向きを見る(ai, 背中, "image/png"),
+      向きを見る(ai, 背中, "image/png", { 背中: true }),
     ]);
     await 利用者.set({ avatar: { back, backFacing } }, { merge: true });
     return { ok: true };
@@ -218,11 +220,10 @@ async function 回数を使う(利用者, 全員, 段階){
 
 /* ── 向きを確かめる ─────────────────────────── */
 export const detectFacing = onCall({
-  region: "asia-northeast1",
   secrets: [OPENAI_API_KEY],
   timeoutSeconds: 60,
 }, async req => {
-  if(!req.auth) throw new HttpsError("unauthenticated", "ログインしてください");
+  ログインした人(req);
   const 利用者 = db.doc(`users/${req.auth.uid}`);
   const a = (await 利用者.get()).data()?.avatar || {};
   if(!a.sit) throw new HttpsError("failed-precondition", "アバターがまだありません");
@@ -233,18 +234,23 @@ export const detectFacing = onCall({
   return { facing };
 });
 
-/* 座っている姿が、見る人から見て左右どちらを向いているか。
-   ⚠️ 見分けられなかったら "right"（頼んだ向き）にする。間違えていたら本人が「自分」で反対にできる */
-async function 向きを見る(ai, 絵, 型){
+/* 座っているアバターが、見る人から見て左右どちらを向いているか（背中：true なら、後ろから見た絵が左上と右上のどちらへ向くか）。
+   ⚠️ 見分けられなかったら "right"（頼んだ向き）にする。間違えていたら本人が「自分のページ」で反対にできる */
+const 向きの問い = {
+  顔: "This image shows a blocky character sitting on a bench or chair. From the viewer's point of view, " +
+      "is the character's face and body turned toward the LEFT side or the RIGHT side of the image? " +
+      "Answer with exactly one word: left or right.",
+  背中: "This image shows a blocky character sitting on a bench or chair, seen from behind (facing away from the viewer). " +
+      "Is the character facing toward the upper-LEFT or the upper-RIGHT of the image? " +
+      "Answer with exactly one word: left or right.",
+};
+async function 向きを見る(ai, 絵, 型, { 背中 = false } = {}){
   try{
     const r = await ai.chat.completions.create({
       model: "gpt-4.1-mini",
       max_tokens: 3,
       messages: [{ role: "user", content: [
-        { type: "text", text:
-          "This image shows a blocky character sitting on a bench or chair. From the viewer's point of view, " +
-          "is the character's face and body turned toward the LEFT side or the RIGHT side of the image? " +
-          "Answer with exactly one word: left or right." },
+        { type: "text", text: 背中 ? 向きの問い.背中 : 向きの問い.顔 },
         { type: "image_url", image_url: { url: `data:${型};base64,${絵.toString("base64")}`, detail: "low" } },
       ]}],
     });
@@ -255,33 +261,12 @@ async function 向きを見る(ai, 絵, 型){
   }
 }
 
-/* 背中の姿が、左上と右上のどちらへ向いて座っているか。見分けられなければ "right"（頼んだ向き） */
-async function 背中の向きを見る(ai, 絵, 型){
-  try{
-    const r = await ai.chat.completions.create({
-      model: "gpt-4.1-mini",
-      max_tokens: 3,
-      messages: [{ role: "user", content: [
-        { type: "text", text:
-          "This image shows a blocky character sitting on a bench or chair, seen from behind (facing away from the viewer). " +
-          "Is the character facing toward the upper-LEFT or the upper-RIGHT of the image? " +
-          "Answer with exactly one word: left or right." },
-        { type: "image_url", image_url: { url: `data:${型};base64,${絵.toString("base64")}`, detail: "low" } },
-      ]}],
-    });
-    return /left/i.test(r.choices?.[0]?.message?.content || "") ? "left" : "right";
-  }catch(e){
-    console.error("背中の向きを見られませんでした", e);
-    return "right";
-  }
-}
-
 /* ── X に投稿する絵のため ─────────────────────────
    ⚠️ Storage の絵を画面の canvas に描くと、別の場所（firebasestorage）の絵なので canvas が「汚れ」、
       書き出せなくなる（バケットの CORS を開ければ済むが、その設定を持ち込みたくない）。
       → 裏の処理が読んで data URL で返す。**アバターの絵だけ**（avatars/ の下の決まった名前だけ）、一度に12枚まで */
-export const borrowImages = onCall({ region: "asia-northeast1" }, async req => {
-  if(!req.auth) throw new HttpsError("unauthenticated", "ログインしてください");
+export const borrowImages = onCall({}, async req => {
+  ログインした人(req);
   const 道ら = Array.isArray(req.data?.paths) ? [...new Set(req.data.paths)].slice(0, 12) : [];
   const 形 = /^avatars\/[A-Za-z0-9_-]+\/[a-z0-9]+\/(sit|turn|back|face)\.webp$/;
   const 返す = {};
@@ -297,12 +282,12 @@ export const borrowImages = onCall({ region: "asia-northeast1" }, async req => {
 /* 読書の記録ページ。firebase.json の rewrites で /s/** がここに来る。
    ⚠️ 中身は shares/{id}（画面が書く）。絵は Storage の shares/{uid}/{id}.jpg（だれでも読める）。
    ⚠️ 人が開いたら、そのまま絵と一言を出し、トップへの道を置く */
-export const sharePage = onRequest({ region: "asia-northeast1" }, async (req, res) => {
+export const sharePage = onRequest({}, async (req, res) => {
   const id = (req.path.match(/^\/s\/([A-Za-z0-9]{10,40})\/?$/) || [])[1];
   const d = id ? (await db.doc(`shares/${id}`).get()).data() : null;
   if(!d){ res.redirect(302, "/"); return; }
   const 逃 = t => String(t ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
-  // 時間は画面と同じ「2時間5分」の形（2026-10-04 にそろえた。app.js の 時間に）
+  // 時間は画面と同じ「2時間5分」の形（2026-10-04 にそろえた）。⚠️ public/画面/共通.js の 時間に の写し。片方を変えたら両方
   const 分 = Number(d.minutes) || 0;
   const 時間 = 分 < 60 ? `${分}分` : `${Math.floor(分 / 60)}時間${分 % 60 ? (分 % 60) + "分" : ""}`;
   const 題 = d.title ? `『${d.title}』を${時間}、${d.place}のベンチで読みました`
@@ -334,14 +319,29 @@ p{margin:18px 0 0}a{color:#513397}</style></head>
 <p><a href="/">GEMuの静かな読書会</a> ― 家にいながら、景色のいい場所で読む。</p></main></body></html>`);
 });
 
+/* ── 読書の記録ページを1週間で消す ─────────────────────
+   2026-10-10 配信者「X の記録ページは、例えば、1週間たったら消す、みたいにしたい」。
+   消したあとに X の投稿のリンクを開くと、sharePage がトップへ移す（記録が無いとき）。X が控えている絵は、しばらく出ることがある。
+   ⚠️ 画面の「読み終える」の注にも「1週間で消えます」と書いてある（画面/読み終える.js） */
+export const cleanShares = onSchedule({ schedule: "every day 04:00", timeZone: "Asia/Tokyo" }, async () => {
+  const 境 = new Date(Date.now() - 7 * 24 * 3600 * 1000);
+  const 古い = await db.collection("shares").where("created", "<", 境).get();
+  await Promise.all(古い.docs.map(async d => {
+    const x = d.data();
+    await getStorage().bucket().file(`shares/${x.uid}/${d.id}.jpg`).delete().catch(() => {});   // 絵が先に消えていても続ける
+    await d.ref.delete();
+  }));
+  console.log(`読書の記録ページを ${古い.size} 件消しました`);
+});
+
 /* ── Amazon の短縮リンクを辿る ─────────────────────
    2026-10-03 配信者「https://amzn.asia/d/… だと検索できない」。短縮リンクはブラウザからは辿れない（CORS）ので、ここで辿る。
    ⚠️ **辿るのは Amazon の短縮リンクだけ**（どこへでも取りに行ける入口にしない）。飛び先も Amazon のときだけ返す。
    ⚠️ HEAD だと 404 が返る。GET で、飛び先（Location）だけを見る。中身は読まない。**リンクは保存しない** */
 const 短縮の家 = /^(amzn\.asia|amzn\.to|a\.co|amzn\.com|link\.amazon(\.[a-z.]+)?)$/i;
 const Amazonの家 = /^(www\.)?amazon\.(co\.jp|com|jp)$/i;
-export const resolveAmazonLink = onCall({ region: "asia-northeast1", timeoutSeconds: 20 }, async req => {
-  if(!req.auth) throw new HttpsError("unauthenticated", "ログインしてください");
+export const resolveAmazonLink = onCall({ timeoutSeconds: 20 }, async req => {
+  ログインした人(req);
   let u;
   try{ u = new URL(String(req.data?.url || "")); }catch{ throw new HttpsError("invalid-argument", "URL が読めません"); }
   if(u.protocol !== "https:" || !短縮の家.test(u.hostname)) throw new HttpsError("invalid-argument", "Amazon の短縮リンクではありません");
@@ -361,9 +361,13 @@ export const resolveAmazonLink = onCall({ region: "asia-northeast1", timeoutSeco
    2026-09-29 配信者：競わせはしないが、参考として「冊数が多い人」「ページ数が多い人」「時間が長い人」を出す。
    志向が違う人がいる、と伝えるため。期間は**これまで全部**。
    ⚠️ 記録（logs・finishes）は本人しか読めない決まりのまま。ここで全員分を数え、**上位3人の名前・顔・数だけ**を返す。
-   ⚠️ 人数が少ないうちは、呼ばれるたびに全部を数え直す。記録が数万件を超えたら、書かれたときに足し込む形（トリガー）に替える */
-export const readerStats = onCall({ region: "asia-northeast1" }, async req => {
-  if(!req.auth) throw new HttpsError("unauthenticated", "ログインしてください");
+   ⚠️ 人数が少ないうちは全部を数え直す。ただし場所の一覧を開くたびに呼ばれるので、同じ入れ物の中では2分のあいだ控えを返す。
+      記録が数万件を超えたら、書かれたときに足し込む形（トリガー）に替える
+   ⚠️ uid は返さない（画面は名前と顔しか使わない） */
+let 読み方の控え = null;   // { 時, 中身 }
+export const readerStats = onCall({}, async req => {
+  ログインした人(req);
+  if(読み方の控え && Date.now() - 読み方の控え.時 < 2 * 60 * 1000) return 読み方の控え.中身;
   const [logs, fins, users] = await Promise.all([
     db.collection("logs").select("uid", "from", "to", "title", "book").get(),
     db.collection("finishes").select("uid", "pages", "title", "book").get(),
@@ -379,7 +383,7 @@ export const readerStats = onCall({ region: "asia-northeast1" }, async req => {
   /* 本のランキング（2026-10-01 配信者）：本を起点に、読了の数・読まれたページの数・読まれた時間。
      本は id（book）でまとめ、id の無い記録は書籍名でまとめる。**だれが読んだかは返さない。**
      ⚠️ 書籍名を出さずに読んだ回（題を出さない印）はどの本か分からないので数えない */
-  const 題を出さない印 = "（題を出さずに読んだ本）";
+  const 題を出さない印 = "（題を出さずに読んだ本）";   // ⚠️ public/席の決まり.js と同じ文字（画面が記録に書く印）
   const 本の計 = new Map();
   const 本に足す = (x, k, v) => {
     if(!x.title || x.title === 題を出さない印) return;
@@ -406,12 +410,19 @@ export const readerStats = onCall({ region: "asia-northeast1" }, async req => {
   const 人 = new Map(users.docs.map(d => [d.id, d.data()]));
   const 上位 = k => [...計].filter(([uid, v]) => Math.round(v[k]) > 0 && 人.has(uid))
     .sort((a, b) => b[1][k] - a[1][k]).slice(0, 3)
-    .map(([uid, v]) => ({ uid, name: 人.get(uid).name || "", face: 人.get(uid).avatar?.face || "", value: Math.round(v[k]) }));
-  return { books: 上位("books"), pages: 上位("pages"), minutes: 上位("minutes"),
+    .map(([uid, v]) => ({ name: 人.get(uid).name || "", face: 人.get(uid).avatar?.face || "", value: Math.round(v[k]) }));
+  const 中身 = { books: 上位("books"), pages: 上位("pages"), minutes: 上位("minutes"),
     bookRank: { finishes: 本の上位("finishes"), pages: 本の上位("pages"), minutes: 本の上位("minutes") } };
+  読み方の控え = { 時: Date.now(), 中身 };
+  return 中身;
 });
 
 /* ── 道具 ─────────────────────────────── */
+function ログインした人(req){
+  if(!req.auth) throw new HttpsError("unauthenticated", "ログインしてください");
+  return req.auth;
+}
+
 function 写真をほどく(dataUrl){
   const m = typeof dataUrl === "string" && dataUrl.match(/^data:image\/(jpeg|png|webp);base64,(.+)$/);
   if(!m) throw new HttpsError("invalid-argument", "写真の形式が読めません");
@@ -469,11 +480,12 @@ function 日本の日付(){
   return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
 }
 
+/* 画面に出す、うまくいかなかったときの言葉（avatar.error に残り、登録の画面と自分のページに出る）。
+   ⚠️ OpenAI の英語の誤りや内部の言葉はそのまま出さない（2026-10-10）。中身は console.error（ログ）で見る */
 function 誤りの言葉(e){
   const m = String(e?.message || "");
   if(e?.status === 400 && /safety|moderation|rejected/i.test(m))
     return "この写真では作れませんでした。別の写真で試してください";
   if(e?.status === 429) return "混み合っています。少し待ってから試してください";
-  if(e?.status === 401) return "OpenAI の鍵が効いていません（運営者に知らせてください）";
-  return "作れませんでした：" + m.slice(0, 120);
+  return "アバターを作れませんでした。時間をおいて、もう一度試してください";
 }

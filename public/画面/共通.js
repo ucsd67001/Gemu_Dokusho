@@ -36,6 +36,9 @@ export const 頁ら = {};            // 頁の名前 → 描く関数（入口�
 export const 動き = {};            // data-する の値 → 押したときの関数
 export const 窓が閉じたら = new Set();   // 小さな画面が閉じたときの後始末
 
+// いま見ている場所での、自分の席（座っていなければ undefined）
+export const 自分の席 = () => 状態.席ら.find(s=>s.uid === 状態.私?.uid);
+
 // しまってある場所（部屋.js の 出す: false）は開かない
 export const 開ける場所か = id => !!部屋ら[id] && 部屋ら[id].出す !== false;
 

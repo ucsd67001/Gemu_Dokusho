@@ -3,7 +3,7 @@
    ============================================================ */
 import { 部屋ら, 部屋の絵 } from "../部屋.js";
 import { 土台, 状態, 時間に } from "./共通.js";
-import { 空きを反転するか, 反転するか } from "./ベンチ.js";
+import { 空きを反転するか, 反転するか, 奥から, 下げるか } from "./ベンチ.js";
 
 const 絵を読む = src => new Promise((ok, ng)=>{
   const 絵 = new Image();
@@ -73,7 +73,7 @@ export async function 共有の絵を描く(題, 分, 場所){
      （前は自分の名札だけを大きく描いていた。ほかの人の名前と本は入れていなかった） */
   const 座られた番 = new Set(状態.席ら.map(s=>s.番));
   const 名札の幅 = W * 0.12, 字 = 14;
-  for(const s of [...状態.席ら].sort((a, b)=>(部屋.席[a.番]?.y || 0) - (部屋.席[b.番]?.y || 0))){
+  for(const s of 奥から(部屋, 状態.席ら)){
     const 席 = 部屋.席[s.番];
     if(!席) continue;
     const 自分 = s.uid === 状態.私.uid;
@@ -85,7 +85,7 @@ export async function 共有の絵を描く(題, 分, 場所){
     g.font = `400 ${字}px "Zen Old Mincho", serif`;
     const 題の文 = 本の題 ? 詰める(g, `『${本の題}』`, 名札の幅 - 12) : "";
     const 幅 = Math.max(名の幅, 題の文 ? g.measureText(題の文).width : 0) + 14, 丈 = 題の文 ? 44 : 26;
-    const 下段 = 席.隣 && 座られた番.has(席.相方);
+    const 下段 = 下げるか(席, 座られた番);
     const 中 = W * 席.x / 100;
     const 上 = ずらし + 高さ * 席.y / 100 + 4 + (下段 ? 丈 + 6 : 0);
     const 左 = Math.max(4, Math.min(W - 幅 - 4, 中 - 幅 / 2));
