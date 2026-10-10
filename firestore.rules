@@ -1,7 +1,7 @@
 rules_version = '2';
 
 /* ============================================================
-   GEMu 読書会 ― Firestore のきまり
+   GEMuの静かな読書会 ― Firestore のきまり
 
    ⚠️ **Google でログインした人は、だれでもその場で登録できる**（Hongaeshi と同じ。2026-09-27 配信者の決定）。
       初めは招待制にしていたが、やめた。料金の歯止めは functions の回数の上限（1人1日・全員1日）で持つ。
@@ -10,14 +10,17 @@ rules_version = '2';
       翻訳しているのは public/土台.js だけ。
 
         users/{uid}          { name, created, flip, avatar{ status, step, sit, turn, face, facing, error, at, day, count } }
-        rooms/{room}/seats/{席番号}  { uid, title, since, seen }
-        logs/{id}            { uid, room, title, from, to }   ← 「読み終える」で終えたときだけ書く
+                             ← avatar の back／backFacing（後ろから見た絵）は 2026-10-10 から作らない（手前の席が無いため）
+        rooms/{room}/seats/{席番号}  { uid, title, since, seen, book }
+        logs/{id}            { uid, room, title, from, to, book }   ← 「読み終える」で終えたときだけ書く
         meta/usage           { day, count }   ← functions だけが書く（アバターを作った回数・全員ぶん）
         books/{id}           { title, author, publisher, isbn, note, status, requestedBy, created, decided }
                              ← 本。status は pending（仮登録）／approved（本登録）／rejected（見送り）
-        admins/{uid}         { }  ← 管理者。**Firebase コンソールで足す**（リポジトリにメールや uid を書かない）
-        finishes/{id}        { uid, title, pages, at }   ← 「読み終える」で読了の印を付けたとき。本人だけ読める
-        shares/{id}          { uid, title, minutes, place, image, created }  ← 読み終えて X に投稿したときの記録。だれでも読める
+        admins/{uid}         { }  ← 管理者。**04_tools/管理者にする.mjs で足す**（リポジトリにメールや uid を書かない）
+        finishes/{id}        { uid, title, pages, at, book }   ← 「読み終える」で読了の印を付けたとき。本人だけ読める
+        shares/{id}          { uid, title, minutes, place, image, created }  ← 読み終えて X に投稿したときの記録。だれでも読める。
+                             **1週間で消える**（functions の cleanShares。2026-10-10 配信者）
+        book は本の id（Hongaeshi から写した本は "h-…"、本登録の本は books の id）。書籍名を出さないときは無いか空
 
    ⚠️ avatar は**裏の処理（functions）だけが書く。**画面からは name と flip（向きを反対にする）しか変えられない。
    ⚠️ 表示名を席や記録に焼き付けない。uid だけ持ち、画面で users から引く。
@@ -35,6 +38,10 @@ service cloud.firestore {
       return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
     function shortText(t, n) { return t is string && t.size() <= n; }
+    // 本の id（無くてもよい）。2026-10-10 に形を確かめるようにした
+    function okBook(d) { return !('book' in d) || shortText(d.book, 40); }
+    // ⚠️ 場所を増やしたら、ここにも足す（public/部屋.js の id と同じ名前）。しまってある cafe は外した（戻すときに足す）
+    function okRoom(r) { return r in ['rothenburg', 'owakudani', 'ashinoko']; }
 
     // 自分が管理者かだけは、本人が確かめられる
     match /admins/{uid} {
@@ -86,15 +93,15 @@ service cloud.firestore {
       function shape() {
         return request.resource.data.keys().hasOnly(['uid', 'title', 'since', 'seen', 'book'])   // book＝本の id（別の端末が本を引き継ぐため）
           && request.resource.data.uid == request.auth.uid
-          && shortText(request.resource.data.title, 120)   // 空＝題を名札に出さない
+          && shortText(request.resource.data.title, 120)   // 空＝書籍名を出さない
+          && okBook(request.resource.data)
           && request.resource.data.seen == request.time
           && request.resource.data.since is timestamp
           && request.resource.data.since <= request.time;
       }
       allow read: if signedIn();
-      // ⚠️ 場所を増やしたら、ここにも足す（public/部屋.js の id と同じ名前）
-      allow create: if signedIn() && room in ['rothenburg', 'owakudani', 'ashinoko', 'cafe']
-        && seat in ['0', '1', '2', '3', '4', '5', '6', '7'] && shape();   // 8人まで（ローテンブルク）
+      allow create: if signedIn() && okRoom(room)
+        && seat in ['0', '1', '2', '3', '4', '5', '6', '7'] && shape();   // どの場所も8人まで（二人掛け4つ）
       allow update: if signedIn() && shape() && (resource.data.uid == request.auth.uid || stale());
       allow delete: if signedIn() && (resource.data.uid == request.auth.uid || stale());
     }
@@ -108,11 +115,13 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['uid', 'room', 'title', 'from', 'to', 'book'])
         && request.resource.data.uid == request.auth.uid
         && validTitle(request.resource.data.title)
-        && request.resource.data.room is string
+        && okRoom(request.resource.data.room)
+        && okBook(request.resource.data)
         && request.resource.data.from is timestamp
         && request.resource.data.to is timestamp
         && request.resource.data.from <= request.resource.data.to
         && request.resource.data.to <= request.time + duration.value(5, 'm')
+        // ⚠️ 2日より前に始まった区切りは書けない（席は12時間で空くので、ふつうは届かない。届いたらその区切りだけ捨てられる）
         && request.resource.data.from >= request.time - duration.value(2, 'd');
     }
 
@@ -125,6 +134,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['uid', 'title', 'pages', 'at', 'book'])
         && request.resource.data.uid == request.auth.uid
         && validTitle(request.resource.data.title)
+        && okBook(request.resource.data)
         && request.resource.data.pages is int
         && request.resource.data.pages >= 0 && request.resource.data.pages <= 20000
         && request.resource.data.at == request.time;
@@ -137,7 +147,7 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['uid', 'title', 'minutes', 'place', 'image', 'created'])
         && request.resource.data.uid == request.auth.uid
-        && shortText(request.resource.data.title, 120)   // 空＝題を出さずに読んだ
+        && shortText(request.resource.data.title, 120)   // 空＝書籍名を出さずに読んだ
         && request.resource.data.minutes is int
         && request.resource.data.minutes >= 0 && request.resource.data.minutes < 1440
         && request.resource.data.place is string && request.resource.data.place.size() <= 40
