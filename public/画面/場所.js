@@ -19,7 +19,8 @@ function 部屋の頁(){
   </section>
   <section class="節 詰めて">
     <p class="気配" id="気配"></p>
-    <div class="舞台" id="舞台" style="aspect-ratio:${部屋.比}"><img class="背景" src="${部屋.絵}" alt="${逃(部屋.名)}の景色"></div>
+    <div class="舞台" id="舞台" data-する="舞台を押す" style="aspect-ratio:${部屋.比}"><img class="背景" src="${部屋.絵}" alt="${逃(部屋.名)}の景色"></div>
+    <p class="注 押すと出る" id="押すと出る" hidden>アバターを押すと、ユーザ名と書籍名が出ます。</p>
     <div id="手もと"></div>
   </section>
   <section class="節">
@@ -30,6 +31,7 @@ function 部屋の頁(){
   /* ⚠️ 「いま読む本」の画面は、席の様子が届いてから出す（満席なら出さない）。
         前は開いた瞬間に出していて、9人目にも本を選ばせ、座ろうとしたところで「満席です」と断っていた */
   状態.席ら = [];
+  開いた番 = null;
   let 初めて = true;
   状態.片づけ.push(土台.席を見張る(状態.部屋, (席ら, 出来事)=>{
     const 前は満席 = 満席か();
@@ -136,6 +138,25 @@ function 戻りを記録(読んだ分){
   手もとを描く();
 }
 
+/* ⚠️⚠️ スマホ（場所の絵が狭いとき）は、ほかの人のユーザ名と書籍名を、アバターを押したときだけ全文で出す（2026-10-11 配信者）。
+   前はいつも出していて、奥の人の枠が手前の人のアバターを隠し、字も「ラーニ…」「『感情…」と途中で切れて何の本か分からなかった。
+   自分の分はいつも出す。パソコン（広いとき）は、いままでどおり全員の分を出す（見た目は style.css の @container）。
+   開いた番 … いま全文を出している席（描き直しても開いたままにする） */
+let 開いた番 = null;
+function 押した席(舞台, e){
+  const 枠 = 舞台.getBoundingClientRect();
+  const 札 = e.target.closest(".名の札");
+  if(札) return Number(札.dataset.番);
+  const x = (e.clientX - 枠.left) / 枠.width * 100, y = (e.clientY - 枠.top) / 枠.height * 100;
+  const 縦横 = 枠.width / 枠.height;
+  const 部屋 = 部屋ら[状態.部屋];
+  // アバターの絵は正方形：横は 幅%、縦は 幅% × 縦横比。足もと（席.y）から上へ。手前（y が大きい）の人を先に
+  const 当たり = 状態.席ら.map(s=>({ 番:s.番, 席:部屋.席[s.番] })).filter(({ 席 })=>席
+    && Math.abs(x - 席.x) <= 席.幅 / 2 && y <= 席.y + 2 && y >= 席.y - 席.幅 * 縦横)
+    .sort((a, b)=>b.席.y - a.席.y);
+  return 当たり[0]?.番 ?? null;
+}
+
 export function 部屋を描き直す(){
   const 舞台 = document.getElementById("舞台");
   if(!舞台) return;
@@ -151,10 +172,14 @@ export function 部屋を描き直す(){
     // 同じベンチに2人いるときは、2人目の名札を1段下げる（横に振り分けると、隣のブロックの名札とぶつかった）
     const 下段 = 下げるか(席, 座られた) ? "下段" : "";
     // tabindex：スマホでは押すと全文が出る（:focus）。パソコンは指を乗せると出る（:hover）
-    return `<div class="名の札 ${s.uid === 状態.私.uid ? "自分" : ""} ${下段}" style="${置き(席)}" tabindex="0">
+    const 開いた = s.番 === 開いた番 ? "開いた" : "";
+    return `<div class="名の札 ${s.uid === 状態.私.uid ? "自分" : ""} ${下段} ${開いた}" data-番="${s.番}" style="${置き(席)}" tabindex="0">
       <b>${逃(状態.人々.get(s.uid)?.名 || "…")}</b>${s.題 ? `<span>『${逃(s.題)}』</span>` : ""}</div>`;
   }).join("");
   絵を入れる(舞台);
+  if(!状態.席ら.some(s=>s.番 === 開いた番)) 開いた番 = null;   // 立った人の枠は閉じる
+  const 押すと出る = document.getElementById("押すと出る");
+  if(押すと出る) 押すと出る.hidden = !状態.席ら.some(s=>s.uid !== 状態.私.uid);
 
   document.getElementById("居る数").textContent = `${状態.席ら.length} / ${部屋.席.length}席`;
   // 部屋の気配。数を誇らず、静かに一行だけ
@@ -208,6 +233,12 @@ export function 手もとを描く(){
 頁ら.部屋 = 部屋の頁;
 窓口.手もとを描く = 手もとを描く;
 Object.assign(動き, {
+  // 場所の絵を押した：押したアバターのユーザ名と書籍名を出す（もう一度押すか、ほかの所を押すと閉じる）
+  舞台を押す: (舞台, e)=>{
+    const 番 = 押した席(舞台, e);
+    開いた番 = 番 === 開いた番 ? null : 番;
+    舞台.querySelectorAll(".名の札").forEach(札=>札.classList.toggle("開いた", Number(札.dataset.番) === 開いた番));
+  },
   席に着く: ()=>満席か() ? 知らせる("いまは満席です。空いたら、お知らせします", true) : 題の窓("席に着く"),
   本を替える: ()=>題の窓("本を替える"),
   戻りを記録: ()=>{

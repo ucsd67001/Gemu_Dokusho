@@ -238,7 +238,16 @@ a.釦,a.釦:hover{text-decoration:none}
 @container (max-width:560px){
   .名の札{padding:1px 4px 2px;max-width:14cqi}
   .名の札 b,.名の札 span{font-size:9px;letter-spacing:.02em}
+  /* ⚠️ 狭いときは、ほかの人の分はアバターを押したときだけ出す（2026-10-11 配信者。重なってアバターを隠し、字も切れていた）。
+        出すときは全文で、いちばん上に重ねる。自分の分はいつも出す */
+  .名の札:not(.自分):not(.開いた){display:none}
 }
+.名の札.開いた{max-width:none;z-index:20}
+.名の札.開いた b,.名の札.開いた span{overflow:visible;text-overflow:clip}
+#舞台{cursor:pointer}
+/* 「アバターを押すと…」の注は、狭い画面だけ */
+.押すと出る{margin-top:8px}
+@media (min-width:641px){ .押すと出る{display:none} }
 
 /* 部屋の気配の一行。舞台の上に、小さく */
 .気配{margin:0 0 12px;font-size:14px;color:var(--字の薄い);letter-spacing:.06em;min-height:1.95em}
@@ -407,7 +416,6 @@ a.書籍名のリンク:hover{color:var(--灯の濃い);text-decoration-color:cu
   .部屋の札{grid-template-columns:1fr;gap:12px}
   .記録{grid-template-columns:1fr auto;gap:4px 12px}
   .記録 .日{grid-column:1 / -1}
-  .名の札{max-width:14cqi}
   .三枚{grid-template-columns:repeat(3,minmax(0,1fr))}
   .三枚 figure{padding:8px}
   .読み方{grid-template-columns:1fr}
