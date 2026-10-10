@@ -14,11 +14,12 @@
      ⚠️ 鍵は Hongaeshi と同じもの（2026-09-27 配信者の指示）。GEMu_AITuber の .env の鍵は使わない
    ・できた絵は 04_tools/下書き/ に PNG と WebP で置く（.gitignore 済み）
    ・気に入った1枚の WebP を public/部屋/{部屋}.webp にして、
-     public/部屋.js の 絵: と 比: と 席 を直す（README「部屋の絵を差し替える」）
+     public/部屋.js の 絵: と 比: と 席 を直す。場所を足すときは firestore.rules の okRoom にも足す（README「場所を足す」）
+   ・広場を広げる（構図はそのまま）：node 04_tools/部屋を作る.mjs owakudani 2 --広げる
 
    ⚠️ 絵の中に人も動物も描かせない。アバターを上に置くため。
    ⚠️ 座るもの（椅子・ベンチ）も描かせない。アバターは座るものごと描いてある（functions/index.js）。
-      代わりに、**何も置いていない地面**を4か所あけさせる。
+      代わりに、**何も置いていない地面**をあけさせる（最初のカフェは「四隅に4か所」。観光地は手前の広場に二人掛けを4つ置く）。
    ⚠️ 画風は、どの部屋も「斜め上から見た、やわらかい立体のミニチュア（ジオラマ）」にそろえる。
       場所が変わっても、アバターの角度（斜め上から 3/4）と合うように。
    ============================================================ */
@@ -113,20 +114,45 @@ const ベンチら = {
 };
 
 const 部屋 = process.argv[2];
+const 枚数 = Math.min(4, Math.max(1, Number(process.argv[3]) || 2));
+const モデル = process.env.IMAGE_MODEL || "gpt-image-1";
+
+/* ── 3つのやり方（新しく作る・広げる・空のベンチ）で同じ道具 ── */
+// 鍵は Secret Manager から読み、そのまま API へ渡すだけ（ファイルにも画面にも出さない）
+const 鍵を読む = () => execSync("firebase functions:secrets:access OPENAI_API_KEY --project gemu-dokusho",
+  { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+const 時刻 = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 12);
+const 置き場 = join(ここ, "下書き");
+// OpenAI に頼んで、返ってきた絵（b64）の並びを返す。うまくいかなければ止める
+async function 頼む(道, 中身, json = true){
+  const r = await fetch(`https://api.openai.com/v1/images/${道}`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${鍵を読む()}`, ...(json ? { "Content-Type": "application/json" } : {}) },
+    body: json ? JSON.stringify(中身) : 中身,
+  });
+  const j = await r.json();
+  if(!r.ok){ console.error("作れませんでした：", j?.error?.message || r.status); process.exit(1); }
+  return j.data.map(d => Buffer.from(d.b64_json, "base64"));
+}
+// 04_tools/下書き/ に PNG と WebP で置く。整え は WebP にする前の sharp の処理（空のベンチは 640px に縮める）
+async function 下書きに置く(png, 名, 整え = x => x.webp({ quality: 86 })){
+  mkdirSync(置き場, { recursive: true });
+  writeFileSync(join(置き場, 名 + ".png"), png);
+  await 整え(sharp(png)).toFile(join(置き場, 名 + ".webp"));
+  console.log("できました：", join("04_tools", "下書き", 名 + ".webp"));
+}
 
 /* ── 広げる：いまの絵の構図はそのままに、ベンチを置く広場だけを広げる（2026-10-04 配信者「ベンチの位置が近すぎるので、
    もう少しゆとりをもって配置できるように、ベンチを置くスペースを広げたい」）。
      node 04_tools/部屋を作る.mjs owakudani 2 --広げる
-   いまの public/部屋/{部屋}.webp を OpenAI の images/edits に渡し、広場のことだけを頼む */
+   いまの public/部屋/{部屋}.webp を OpenAI の images/edits に渡し、広場のことだけを頼む。
+   ⚠️ 手直しすると、全体の色が少し黄色寄りになる（2026-10-04 に大涌谷と芦ノ湖でそうなった） */
 const 広げ方 = {
   owakudani: "the flat stone-paved viewing terrace in the front",
   ashinoko: "the flat stone-paved lakeside terrace in the front",
 };
 if(process.argv.includes("--広げる")){
-  if(!広げ方[部屋]){ console.error(`広げられる場所：${Object.keys(広げ方).join(" / ")}`); process.exit(1); }
-  const 枚数 = Math.min(4, Math.max(1, Number(process.argv[3]) || 2));
-  const 鍵 = execSync("firebase functions:secrets:access OPENAI_API_KEY --project gemu-dokusho",
-    { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  if(!広げ方[部屋]){ console.error(`広げられる場所：${Object.keys(広げ方).join(" / ")}（足すときは 広げ方 に広場の言い方を書く）`); process.exit(1); }
   const 元 = await sharp(join(ここ, "../public/部屋", `${部屋}.webp`)).png().toBuffer();
   const 指示 = [
     "Edit this isometric diorama illustration.",
@@ -137,83 +163,32 @@ if(process.argv.includes("--広げる")){
     "Keep the terrace completely EMPTY: no benches, no chairs, no stools, no people, no animals, no text.",
   ].join(" ");
   const 書式 = new FormData();
-  書式.append("model", process.env.IMAGE_MODEL || "gpt-image-1");
+  書式.append("model", モデル);
   書式.append("image", new Blob([元], { type: "image/png" }), `${部屋}.png`);
   書式.append("prompt", 指示);
   書式.append("n", String(枚数));
   書式.append("size", "1536x1024");
   書式.append("quality", "high");
   console.log(`${部屋} の広場を広げた絵を ${枚数} 枚作ります（1〜3分）…`);
-  const r = await fetch("https://api.openai.com/v1/images/edits", {
-    method: "POST", headers: { "Authorization": `Bearer ${鍵}` }, body: 書式,
-  });
-  const j = await r.json();
-  if(!r.ok){ console.error("作れませんでした：", j?.error?.message || r.status); process.exit(1); }
-  const 置き場 = join(ここ, "下書き");
-  mkdirSync(置き場, { recursive: true });
-  const 時 = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 12);
-  for(const [i, d] of j.data.entries()){
-    const png = Buffer.from(d.b64_json, "base64");
-    const 名 = `${部屋}_広げた_${時}_${i + 1}`;
-    writeFileSync(join(置き場, 名 + ".png"), png);
-    await sharp(png).webp({ quality: 86 }).toFile(join(置き場, 名 + ".webp"));
-    console.log("できました：", join("04_tools", "下書き", 名 + ".webp"));
-  }
+  for(const [i, png] of (await 頼む("edits", 書式, false)).entries()) await 下書きに置く(png, `${部屋}_広げた_${時刻}_${i + 1}`);
   process.exit(0);
 }
 
+/* ── 空のベンチ（前向き・後ろ向き）。アバターと同じく 640px の WebP にする（場所の絵で同じ大きさに並べるため） ── */
 if(部屋 === "bench"){
-  const 鍵 = execSync("firebase functions:secrets:access OPENAI_API_KEY --project gemu-dokusho",
-    { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-  const 置き場 = join(ここ, "下書き");
-  mkdirSync(置き場, { recursive: true });
-  const 時 = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 12);
   for(const [向き, 指示] of Object.entries(ベンチら)){
-    const r = await fetch("https://api.openai.com/v1/images/generations", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${鍵}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: process.env.IMAGE_MODEL || "gpt-image-1", prompt: 指示, n: 1,
-        size: "1024x1024", quality: "medium", background: "transparent", output_format: "png" }),
-    });
-    const j = await r.json();
-    if(!r.ok){ console.error("作れませんでした：", j?.error?.message || r.status); process.exit(1); }
-    const png = Buffer.from(j.data[0].b64_json, "base64");
-    const 名 = `bench_${向き}_${時}`;
-    writeFileSync(join(置き場, 名 + ".png"), png);
-    // アバターと同じく 640px の WebP にする（部屋で同じ大きさに並べるため）
-    await sharp(png).resize(640, 640, { fit: "inside" }).webp({ quality: 88, alphaQuality: 100 }).toFile(join(置き場, 名 + ".webp"));
-    console.log("できました：", join("04_tools", "下書き", 名 + ".webp"));
+    const [png] = await 頼む("generations", { model: モデル, prompt: 指示, n: 1,
+      size: "1024x1024", quality: "medium", background: "transparent", output_format: "png" });
+    await 下書きに置く(png, `bench_${向き}_${時刻}`, x => x.resize(640, 640, { fit: "inside" }).webp({ quality: 88, alphaQuality: 100 }));
   }
   process.exit(0);
 }
+
+/* ── 場所の絵を新しく作る ── */
 if(!指示ら[部屋]){
-  console.error(`部屋の名前を付けてください：${Object.keys(指示ら).join(" / ")}`);
+  console.error(`場所の名前を付けてください：${Object.keys(指示ら).join(" / ")} / bench`);
   process.exit(1);
 }
-const 枚数 = Math.min(4, Math.max(1, Number(process.argv[3]) || 2));
-const モデル = process.env.IMAGE_MODEL || "gpt-image-1";
-const 鍵 = execSync("firebase functions:secrets:access OPENAI_API_KEY --project gemu-dokusho",
-  { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-
-const 置き場 = join(ここ, "下書き");
-mkdirSync(置き場, { recursive: true });
-
 console.log(`${部屋} を ${モデル} で ${枚数} 枚作ります（1〜2分）…`);
-const r = await fetch("https://api.openai.com/v1/images/generations", {
-  method: "POST",
-  headers: { "Authorization": `Bearer ${鍵}`, "Content-Type": "application/json" },
-  body: JSON.stringify({ model: モデル, prompt: 指示ら[部屋].join(" "), n: 枚数, size: "1536x1024", quality: "high" }),
-});
-const j = await r.json();
-if(!r.ok){
-  console.error("作れませんでした：", j?.error?.message || r.status);
-  process.exit(1);
-}
-const 時 = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 12);
-for(const [i, d] of j.data.entries()){
-  const png = Buffer.from(d.b64_json, "base64");
-  const 名 = `${部屋}_${時}_${i + 1}`;
-  writeFileSync(join(置き場, 名 + ".png"), png);
-  await sharp(png).webp({ quality: 86 }).toFile(join(置き場, 名 + ".webp"));
-  console.log("できました：", join("04_tools", "下書き", 名 + ".webp"));
-}
+const 絵ら = await 頼む("generations", { model: モデル, prompt: 指示ら[部屋].join(" "), n: 枚数, size: "1536x1024", quality: "high" });
+for(const [i, png] of 絵ら.entries()) await 下書きに置く(png, `${部屋}_${時刻}_${i + 1}`);
