@@ -294,7 +294,9 @@ firestore.rules / storage.rules / firestore.indexes.json
     Kindle 版（B0…）は引けない。**リンクは保存しない**
   - **短縮リンク**（amzn.asia／amzn.to／a.co など）は、画面からは辿れない（CORS）ので、functions の `resolveAmazonLink` が辿る
     （2026-10-03 配信者）。⚠️ 辿るのは Amazon の短縮リンクだけ、返すのも Amazon の商品のリンクだけ（どこへでも取りに行ける入口にしない）。
-    HEAD は 404 になるので GET で、飛び先（Location）だけを見る
+    HEAD は 404 になるので GET で、飛び先（Location）だけを見る。
+    ⚠️ `link.amazon/…` は途中で `amzlinks.in`（Amazon の中継先）を通る（link.amazon → amzlinks.in → amazon.co.jp）。
+    2026-10-11 に配信者の iPhone で辿れなかったので、中継先として通すようにした（入口としては受け付けない）
   - **ISBN を確かめる**：同じく openBD。ページ数が載っていれば受け取り、読了のときに入れておく
   - 「**＋ 本の登録を申請する**」はボタンにして目立たせる（2026-09-30。見落とされた。⚠️ さがす欄に URL を貼る形は作ったが、配信者の希望で外した）
   - 著者欄は **`名寄せ.js`（Hongaeshi の写し）**の規則で「山形浩生」の形にする

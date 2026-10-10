@@ -339,6 +339,9 @@ export const cleanShares = onSchedule({ schedule: "every day 04:00", timeZone: "
    ⚠️ **辿るのは Amazon の短縮リンクだけ**（どこへでも取りに行ける入口にしない）。飛び先も Amazon のときだけ返す。
    ⚠️ HEAD だと 404 が返る。GET で、飛び先（Location）だけを見る。中身は読まない。**リンクは保存しない** */
 const 短縮の家 = /^(amzn\.asia|amzn\.to|a\.co|amzn\.com|link\.amazon(\.[a-z.]+)?)$/i;
+/* ⚠️ 途中で通るだけの Amazon の中継先（2026-10-11 配信者の iPhone で、link.amazon/… の短縮リンクが辿れなかった）。
+      link.amazon → amzlinks.in → amazon.co.jp と2回飛ぶ。ここは入口としては受け付けず、途中で通るときだけ許す */
+const 中継の家 = /^amzlinks\.in$/i;
 const Amazonの家 = /^(www\.)?amazon\.(co\.jp|com|jp)$/i;
 export const resolveAmazonLink = onCall({ timeoutSeconds: 20 }, async req => {
   ログインした人(req);
@@ -352,7 +355,7 @@ export const resolveAmazonLink = onCall({ timeoutSeconds: 20 }, async req => {
     if(!先) break;
     u = new URL(先, u);
     if(Amazonの家.test(u.hostname)) return { url: u.origin + u.pathname };
-    if(!短縮の家.test(u.hostname)) break;
+    if(!短縮の家.test(u.hostname) && !中継の家.test(u.hostname)) break;
   }
   throw new HttpsError("not-found", "短縮リンクの飛び先が見つかりませんでした");
 });
