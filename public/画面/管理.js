@@ -5,7 +5,7 @@ import { ISBNで確かめる } from "../書誌.js";
 import { 土台, 画面, 状態, 頁ら, 動き, 逃, 知らせる, 待ちの画面, 日時に } from "./共通.js";
 
 /* ── 管理（本の申請を承認する） ───────────────────
-   管理者（Firebase コンソールで admins/{uid} を足した人）だけに出る（2026-09-29 配信者）。
+   管理者（admins/{uid}。04_tools/管理者にする.mjs で足す）だけに出る（2026-09-29 配信者）。
    承認すると本登録（みんなが選べる）。見送ると、申請した本人の一覧からも消える。
    承認の前に、書名・著者名・出版社名を直せる（表記をそろえるため） */
 async function 管理の頁(){
@@ -26,10 +26,10 @@ async function 管理の頁(){
     <div class="申請">
       <div class="申請の素性">申請：${逃(状態.人々.get(b.申請者)?.名 || "（ユーザ名なし）")}
         ${b.申請日 ? `／${日時に(b.申請日)}` : ""}${b.isbn ? `／ISBN ${逃(b.isbn)}` : ""}${b.ひとこと ? `／「${逃(b.ひとこと)}」` : ""}</div>
-      <label class="名札" for="管題-${逃(b.id)}">書籍名</label><input class="欄" id="管題-${逃(b.id)}" maxlength="120" value="${逃(b.題)}">
-      <label class="名札" for="管著-${逃(b.id)}">著者名</label><input class="欄" id="管著-${逃(b.id)}" maxlength="80" value="${逃(b.著)}">
-      <label class="名札" for="管版元-${逃(b.id)}">出版社名</label><input class="欄" id="管版元-${逃(b.id)}" maxlength="80" value="${逃(b.版元)}">
-      <label class="名札" for="管ページ-${逃(b.id)}">ページ数（わかれば。読了のときに入っておく）</label><input class="欄" id="管ページ-${逃(b.id)}" type="number" inputmode="numeric" min="0" max="20000" value="${b.ページ || ""}">
+      <label class="欄の名" for="管題-${逃(b.id)}">書籍名</label><input class="欄" id="管題-${逃(b.id)}" maxlength="120" value="${逃(b.題)}">
+      <label class="欄の名" for="管著-${逃(b.id)}">著者名</label><input class="欄" id="管著-${逃(b.id)}" maxlength="80" value="${逃(b.著)}">
+      <label class="欄の名" for="管版元-${逃(b.id)}">出版社名</label><input class="欄" id="管版元-${逃(b.id)}" maxlength="80" value="${逃(b.版元)}">
+      <label class="欄の名" for="管ページ-${逃(b.id)}">ページ数（わかれば。読了のときに入っておく）</label><input class="欄" id="管ページ-${逃(b.id)}" type="number" inputmode="numeric" min="0" max="20000" value="${b.ページ || ""}">
       ${b.isbn ? `<div class="釦たち 上の間">
         <button class="釦 枠だけ 小" data-する="書誌を引き直す" data-本="${逃(b.id)}" data-isbn="${逃(b.isbn)}">ISBN から書誌を引き直す</button></div>
         <div id="管確認-${逃(b.id)}"></div>` : ""}

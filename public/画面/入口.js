@@ -1,15 +1,15 @@
 /* ============================================================
    入口・はじめての登録（ユーザ名と写真）・アバターを作っているあいだ・できあがり
    ============================================================ */
-import { 部屋ら, 部屋の絵, 最初の部屋 } from "../部屋.js";
-import { 土台, 試しか, 画面, 状態, 頁ら, 動き, 逃, 知らせる, 描く, 行く, 絵を入れる } from "./共通.js";
+import { 部屋ら, 最初の部屋 } from "../部屋.js";
+import { 土台, 試しか, 画面, 状態, 頁ら, 動き, 変わったら, 誤りの言葉, 逃, 知らせる, 描く, 行く, 絵を入れる } from "./共通.js";
 import { 人とベンチ } from "./ベンチ.js";
 
 /* ── 入口 ─────────────────────────────── */
 function 入口(){
   const 部屋 = 部屋ら[最初の部屋];
   画面.innerHTML = `
-  <div class="看板"><div class="舞台" style="aspect-ratio:${部屋.比}"><img class="背景" src="${部屋の絵(部屋)}" alt="${逃(部屋.名)}">${人とベンチ(部屋, [])}</div></div>
+  <div class="看板"><div class="舞台" style="aspect-ratio:${部屋.比}"><img class="背景" src="${部屋.絵}" alt="${逃(部屋.名)}">${人とベンチ(部屋, [])}</div></div>
   <section class="幕">
     <p class="英字の札">GEMu Dokusho</p>
     <h1 class="大見出し">家にいながら、<br>景色のいい場所で読む。</h1>
@@ -29,11 +29,11 @@ let 選んだ写真 = null;   // 縮めた data URL
 
 export function 写真の欄(){
   return `
-    <p class="名札">自分の写真か、絵</p>
+    <p class="欄の名">自分の写真か、絵</p>
     <div class="写真の枠">
       ${選んだ写真 ? `<img class="写真の見本" src="${選んだ写真}" alt="">` : `<div class="写真の見本">まだです</div>`}
       <div>
-        <label class="釦 枠だけ 小">写真を選ぶ<input type="file" accept="image/*" data-する="写真"></label>
+        <label class="釦 枠だけ 小">写真を選ぶ<input type="file" accept="image/*" data-変わる="写真"></label>
         <p class="注 近く">自分の写真でも、好きなキャラクターの絵でも。写っているものを、そのままブロックのアバターにします。</p>
       </div>
     </div>
@@ -47,7 +47,7 @@ function 登録(){
     <p class="英字の札">Welcome</p>
     <h1 class="中見出し">はじめまして</h1>
     <p class="導き">ユーザ名と写真を決めると、写真をもとに、ブロックのアバターを作ります。</p>
-    <label class="名札" for="名の欄">ユーザ名（アバターの足もとに出ます）</label>
+    <label class="欄の名" for="名の欄">ユーザ名（アバターの足もとに出ます）</label>
     <input id="名の欄" class="欄" maxlength="20" placeholder="例：しおり" value="${逃(状態.自分?.名 || "")}">
     ${写真の欄()}
     ${誤り ? `<p class="誤りの字">${逃(誤り)}</p>` : ""}
@@ -64,7 +64,7 @@ function 作っている(){
   <div class="待つ">
     <div class="積み木">${"<i></i>".repeat(6)}</div>
     <p class="段の字">${逃((a?.状態 === "making" && a.段階) || "描きはじめています")}</p>
-    <p class="注">4枚描くので、1〜2分かかります。<br>このページを閉じても、描き続けます。できたら、次に開いたときに出ます。</p>
+    <p class="注">3枚描くので、1〜2分かかります。<br>このページを閉じても、描き続けます。できたら、次に開いたときに出ます。</p>
   </div>`;
 }
 
@@ -74,7 +74,7 @@ function できあがり(){
   <section class="幕">
     <p class="英字の札">Your avatar</p>
     <h1 class="中見出し">できました</h1>
-    <p class="導き">奥の席では顔が、手前の席では背中が見えます。ときどき、ページをめくります。</p>
+    <p class="導き">場所ごとに、決まった方を向いてベンチに座ります。ときどき、ページをめくります。</p>
     ${三枚(a)}
     <div class="釦たち 上の広い間">
       <button class="釦" data-する="場所へ" data-部屋="${最初の部屋}">${逃(部屋ら[最初の部屋].名)}へ</button>
@@ -85,11 +85,11 @@ function できあがり(){
   絵を入れる(画面);
 }
 
+/* できあがったアバターの3枚（座って読む・ページをめくる・顔）。
+   ⚠️ 背中は作らない（2026-10-10 配信者。いまの場所に手前の席が無い）。前は4枚目に「背中（手前の席）」を出していた */
 export const 三枚 = a => `<div class="三枚">
-  <figure><img data-道="${逃(a.座る)}" alt="座って読むアバター"><figcaption>座って読む（奥の席）</figcaption></figure>
+  <figure><img data-道="${逃(a.座る)}" alt="座って読むアバター"><figcaption>座って読む</figcaption></figure>
   <figure><img data-道="${逃(a.めくる)}" alt="ページをめくるアバター"><figcaption>ページをめくる</figcaption></figure>
-  <figure>${a.背中 ? `<img data-道="${逃(a.背中)}" alt="後ろから見たアバター">` : `<div class="まだ">まだありません</div>`}
-    <figcaption>背中（手前の席）</figcaption></figure>
   <figure><img data-道="${逃(a.顔)}" alt="アバターの顔"><figcaption>顔</figcaption></figure>
 </div>`;
 
@@ -109,7 +109,7 @@ export function 名を読む(){
   return 名;
 }
 
-export async function 作る(名){
+async function 作る(名){
   if(!選んだ写真) return 知らせる("写真を選んでください", true);
   try{
     if(名) await 土台.名を決める(名);
@@ -126,14 +126,14 @@ export async function 作る(名){
     console.error(e);
     状態.頼んでいる = false;
     状態.作ったばかり = false;
-    知らせる(e.message || "アバターを作れませんでした", true);
+    知らせる(誤りの言葉(e, "アバターを作れませんでした。時間をおいて、もう一度試してください"), true);
     描く();
   }
 }
 
-document.addEventListener("change", async e=>{
-  if(e.target.dataset?.する !== "写真") return;
-  const f = e.target.files?.[0];
+// 写真を選んだら、縮めて見本を出す
+変わったら.写真 = async 欄=>{
+  const f = 欄.files?.[0];
   if(!f) return;
   try{ 選んだ写真 = await 写真を縮める(f); }
   catch(err){ return 知らせる("この写真は読めませんでした", true); }
@@ -141,7 +141,7 @@ document.addEventListener("change", async e=>{
   const 見本 = document.querySelector(".写真の見本");
   見本?.insertAdjacentHTML("afterend", `<img class="写真の見本" src="${選んだ写真}" alt="">`);
   見本?.remove();
-});
+};
 
 Object.assign(頁ら, { 入口, 登録, 作っている, できあがり });
 Object.assign(動き, {

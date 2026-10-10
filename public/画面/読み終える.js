@@ -2,7 +2,7 @@
    「読み終える」の画面と、X への投稿
    ============================================================ */
 import { 部屋ら } from "../部屋.js";
-import { 土台, 根, 状態, 動き, 自分の席, 逃, 知らせる, 窓を出す, 窓を閉じる, 行く, 時間に, 待ちの画面 } from "./共通.js";
+import { 土台, 根, 状態, 動き, 変わったら, 自分の席, 逃, 知らせる, 窓を出す, 窓を閉じる, 行く, 時間に, 待ちの画面 } from "./共通.js";
 import { 戻りの窓 } from "./場所.js";
 import { 前の本を忘れる } from "./本を選ぶ.js";
 import { 共有の絵を描く } from "./Xに載る絵.js";
@@ -32,9 +32,9 @@ function 読み終える窓(){
   読み終えの中身 = { 題, 本, 分, 場所 };
   窓を出す("読み終える", `
     <p class="窓の文">${題 ? `『${逃(題)}』を、` : ""}${逃(場所)}のベンチで <b>${時間に(分)}</b> 読みました。</p>
-    ${題 ? `<label class="読了の印"><input type="checkbox" id="読了の印"> この本を最後まで読んだ（読了）</label>` : ""}
+    ${題 ? `<label class="読了の印"><input type="checkbox" id="読了の印" data-変わる="読了の印"> この本を最後まで読んだ（読了）</label>` : ""}
     <div id="総ページの欄" hidden>
-      <label class="名札" for="総ページ">この本の総ページ数（わかれば）</label>
+      <label class="欄の名" for="総ページ">この本の総ページ数（わかれば）</label>
       <input id="総ページ" class="欄" type="number" inputmode="numeric" min="0" max="20000" placeholder="例：320"
         value="${状態.いまの本?.id === 本 && 状態.いまの本.ページ ? 状態.いまの本.ページ : ""}">
     </div>
@@ -44,7 +44,8 @@ function 読み終える窓(){
       <button class="釦 全幅" data-する="投稿して終える" disabled>X に投稿して終える</button>
       <button class="釦 枠だけ 全幅" data-する="そのまま終える">投稿しないで終える</button>
     </div>
-    <p class="注">投稿には、この絵と、書籍名と、読んだ時間が入ります。絵には、その場にいる人のユーザ名と書籍名も写ります。</p>`);
+    <p class="注">投稿には、この絵と、書籍名と、読んだ時間が入ります。絵には、その場にいる人のユーザ名と書籍名も写ります。
+      投稿のリンク先（読書の記録ページ）は、1週間で消えます。</p>`);
   共有の絵を描く(題, 分, 場所).then(絵=>{
     読み終えの絵 = 絵;
     const 見本 = document.getElementById("共有の見本");
@@ -86,11 +87,10 @@ async function 終える(){
 }
 
 // 読了の印を付けたら、総ページ数の欄を出す
-document.addEventListener("change", e=>{
-  if(e.target.id !== "読了の印") return;
+変わったら.読了の印 = 印=>{
   const 欄 = document.getElementById("総ページの欄");
-  if(欄){ 欄.hidden = !e.target.checked; if(e.target.checked) document.getElementById("総ページ")?.focus(); }
-});
+  if(欄){ 欄.hidden = !印.checked; if(印.checked) document.getElementById("総ページ")?.focus(); }
+};
 
 Object.assign(動き, {
   読み終える: ()=>読み終える窓(),
@@ -132,7 +132,8 @@ Object.assign(動き, {
     catch(e){ console.error(e); }
     /* 文・ハッシュタグ・リンクのあいだに空の行を1つずつ（2026-09-29 配信者）。
        ⚠️ リンクは url= で渡さず、文に入れる。url= だと X が文のすぐ後ろ（同じ行）につなげる */
-    const 先 = "https://x.com/intent/post?text=" + encodeURIComponent(`${文}\n\n#GEMuの静かな読書会\n\n${行き先}`);
+    投稿の文 = `${文}\n\n#GEMuの静かな読書会\n\n${行き先}`;
+    const 先 = "https://x.com/intent/post?text=" + encodeURIComponent(投稿の文);
     const 読了 = 読了を読む();
     if(読了) 前の本を忘れる();
     await 土台.立つ({ 記録する:true, 読了 }).catch(()=>{});
@@ -146,7 +147,6 @@ Object.assign(動き, {
        → ①アプリ専用の呼び出し（twitter://post）で、アプリの投稿画面を直接開く ②共有シートから X を選ぶ
          ③ブラウザの X（いままでの形。アプリが無い人用）の3つを出す */
     if(スマホ){
-      投稿の文 = `${文}\n\n#GEMuの静かな読書会\n\n${行き先}`;
       const アプリへ = "twitter://post?message=" + encodeURIComponent(投稿の文);
       窓を出す("X に投稿する", `
         <p class="窓の文">準備ができました。読んだ時間は記録に残しました。</p>

@@ -34,7 +34,20 @@ export const 状態 = {
 // 登録の場所
 export const 頁ら = {};            // 頁の名前 → 描く関数（入口・登録・作っている・できあがり・廊下・部屋・記録・自分・管理）
 export const 動き = {};            // data-する の値 → 押したときの関数
+// data-変わる の値 → 欄が変わったとき（change）／打ったとき（input）の関数（2026-10-10。前は画面ごとに document へ受け口を足していた）
+export const 変わったら = {};
+export const 打ったら = {};
+document.addEventListener("change", e=>{ 変わったら[e.target.dataset?.変わる]?.(e.target, e); });
+document.addEventListener("input", e=>{ 打ったら[e.target.dataset?.変わる]?.(e.target, e); });
 export const 窓が閉じたら = new Set();   // 小さな画面が閉じたときの後始末
+
+/* 裏の処理や Firebase の誤りを、画面に出す言葉にする。
+   日本語の文（裏の処理が決めた文）はそのまま、英語（deadline-exceeded など）は出さずに 既定 の文にする（2026-10-10） */
+export function 誤りの言葉(e, 既定){
+  console.error(e);
+  const 文 = String(e?.message || "");
+  return /[\u3040-\u30ff\u4e00-\u9fff]/.test(文) ? 文 : 既定;
+}
 
 // いま見ている場所での、自分の席（座っていなければ undefined）
 export const 自分の席 = () => 状態.席ら.find(s=>s.uid === 状態.私?.uid);
@@ -97,7 +110,9 @@ document.addEventListener("keydown", e=>{
   else if(!e.shiftKey && document.activeElement === 最後){ e.preventDefault(); 最初.focus(); }
 });
 
-// 絵の道（Storage の場所）から URL を引いて、img[data-道] に入れる
+/* 絵の道（Storage の場所）から URL を引いて、img[data-道] に入れる。
+   ⚠️ 控えが2段ある（ここと 土台.js の 絵のURL）。ここは同じ処理の中ですぐ入れるため（描き直しでちらつかない）、
+      土台.js は同じ絵を同時に何度も取りに行かないため。どちらも要る */
 const URLの控え = new Map();
 
 export function 絵を入れる(根の要素 = document){

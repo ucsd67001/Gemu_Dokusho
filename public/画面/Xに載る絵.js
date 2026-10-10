@@ -1,9 +1,9 @@
 /* ============================================================
    X に載る絵（読み終えるときに作る、場所の絵と書籍名・時間の1枚）
    ============================================================ */
-import { 部屋ら, 部屋の絵 } from "../部屋.js";
+import { 部屋ら } from "../部屋.js";
 import { 土台, 状態, 時間に } from "./共通.js";
-import { 空きを反転するか, 反転するか, 奥から, 下げるか } from "./ベンチ.js";
+import { 描くもの, 奥から, 下げるか } from "./ベンチ.js";
 
 const 絵を読む = src => new Promise((ok, ng)=>{
   const 絵 = new Image();
@@ -35,27 +35,18 @@ export async function 共有の絵を描く(題, 分, 場所){
     document.fonts.load('400 24px "Zen Old Mincho"'),
   ]).catch(()=>{});
 
-  const 背景 = await 絵を読む(部屋の絵(部屋));
+  const 背景 = await 絵を読む(部屋.絵);
   const 高さ = W * 背景.naturalHeight / 背景.naturalWidth;
   const ずらし = -(高さ - H) * 0.6;   // 上を少し切る（帯の下に、ベンチが来るように）
   g.fillStyle = "#f3e7d3";
   g.fillRect(0, 0, W, H);
   g.drawImage(背景, 0, ずらし, W, 高さ);
 
-  const 座られた = new Map(状態.席ら.map(s=>[s.番, s]));
-  const 描くもの = 部屋.席.map((席, 番)=>{
-    const s = 座られた.get(番);
-    if(s){
-      const 人 = 状態.人々.get(s.uid), a = 人?.アバター || {};
-      const 背中 = 席.姿 === "背中" && !!a.背中;
-      return { 席, 道:背中 ? a.背中 : a.座る, 反転:反転するか(人, 席, 背中) };
-    }
-    if(部屋.空き) return { 席, src:部屋.空き[席.姿] || 部屋.空き.顔, 反転:空きを反転するか(部屋, 席) };
-    return null;
-  }).filter(Boolean).sort((a, b)=>a.席.y - b.席.y);
-  const 借りた = await 土台.絵を借りる(描くもの.map(x=>x.道).filter(Boolean)).catch(()=>({}));
-  for(const x of 描くもの){
-    const src = x.道 ? 借りた[x.道] : x.src;
+  // 何をどちら向きに描くかは、場所の絵と同じ（ベンチ.js の 描くもの）
+  const 並び = 描くもの(部屋, 状態.席ら);
+  const 借りた = await 土台.絵を借りる(並び.map(x=>x.座る).filter(Boolean)).catch(()=>({}));
+  for(const x of 並び){
+    const src = x.空き || 借りた[x.座る];
     if(!src) continue;
     const 絵 = await 絵を読む(src).catch(()=>null);
     if(!絵) continue;

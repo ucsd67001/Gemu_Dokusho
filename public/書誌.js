@@ -32,15 +32,15 @@ export function ISBN13にする(isbn){
    Hongaeshi の 共通.js の Amazonの表紙・Amazonのリンク と同じ作り。タグも同じ（配信者が「タグ付きで」を選んだ）。
    ⚠️⚠️ **表紙の直リンク（images/P/{ASIN}）は、Amazon アソシエイトの規約上グレー。承知のうえで使っている。**
       規約は商品画像を PA-API から取ることを求めている。Hongaeshi と同じく、
-      **表紙は必ずアフィリエイトのリンクと一緒に出す**（app.js の 表紙）。リンクの無いところに表紙だけを出さない。
+      **表紙は必ずアフィリエイトのリンクと一緒に出す**（画面/本.js の 表紙）。リンクの無いところに表紙だけを出さない。
    ⚠️ サイトの下に「Amazon アソシエイト・プログラムの参加者です」の表示が要る（index.html・demo.html の裾）
    ・ASIN は、Hongaeshi で設定したリンクのもの（本棚.json の asin）を先に使い、無ければ ISBN-10（紙の本は ASIN と同じ）
    ・Kindle だけの本など、ISBN の無い本には出さない
    ・**Amazon は、表紙が無くても 1×1 の透明な絵を返す**（読めたかどうかでは分からない）→ 出たところの大きさで見る
    ============================================================ */
-export const アソシエイトタグ = "ucsd67001-22";
+const アソシエイトタグ = "ucsd67001-22";
 
-export function ISBN10にする(isbn){
+function ISBN10にする(isbn){
   const d = String(isbn || "").replace(/[^0-9Xx]/g, "");
   if(/^[0-9]{9}[0-9Xx]$/.test(d)) return d.toUpperCase();
   if(!/^978[0-9]{10}$/.test(d)) return null;   // 979 は ISBN-10 に直せない

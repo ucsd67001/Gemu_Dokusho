@@ -1,7 +1,7 @@
 /* ============================================================
    記録（読んだ時間のページ）
    ============================================================ */
-import { 土台, 画面, 頁ら, 分に, 待ちの画面 } from "./共通.js";
+import { 土台, 画面, 頁ら, 分に, 日時に, 待ちの画面 } from "./共通.js";
 import { 表紙, 書籍名, 本の表 } from "./本.js";
 
 /* ── 記録 ─────────────────────────────── */
@@ -25,14 +25,10 @@ async function 記録の頁(){
   const 長さ = r => Math.max(0, r.終わり - r.始め);
   const 今日の始め = new Date(); 今日の始め.setHours(0, 0, 0, 0);
   const 計 = 条件 => 記録.filter(条件).reduce((s, r)=>s + 長さ(r), 0);
-  const 日付 = t => { const d = new Date(t);
-    return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
 
-  const 数字 = (名, ms) =>{
-    const 分 = Math.round(ms / 60000);
-    return `<div class="数字"><div class="名">${名}</div>
-      <div class="値">${分 >= 60 ? `${Math.floor(分 / 60)}<small>時間</small>${分 % 60 ? `${分 % 60}<small>分</small>` : ""}` : `${分}<small>分</small>`}</div></div>`;
-  };
+  // 大きな数字で「2時間5分」（単位だけ小さく）。書き方は 分に と同じ
+  const 数字 = (名, ms) => `<div class="数字"><div class="名">${名}</div>
+      <div class="値">${分に(ms).replace(/(時間|分)/g, "<small>$1</small>")}</div></div>`;
   中.innerHTML = `
     <div class="数字たち">
       ${数字("今日", 計(r=>r.始め >= 今日の始め.getTime()))}
@@ -49,7 +45,7 @@ async function 記録の頁(){
       <div class="節の頭"><h2 class="節見出し">これまで</h2><p class="節の添え">${記録.length}回</p></div>
       <div class="記録の列">
         ${記録.length ? 記録.map(r=>`<div class="記録">
-          <span class="日">${日付(r.始め)}</span>
+          <span class="日">${日時に(r.始め)}</span>
           ${r.題 === 土台.題を出さない印
             ? `<span class="題"><span class="表紙 小" aria-hidden="true"></span><span class="注">（書籍名を出さずに読んだ回）</span></span>`
             : `<span class="題">${表紙(表.引く(r.本, r.題))}<span>${書籍名(表.引く(r.本, r.題), r.題)}</span></span>`}

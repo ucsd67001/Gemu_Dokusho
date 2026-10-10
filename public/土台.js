@@ -119,7 +119,7 @@ export async function アバターを作る(写真){
 export async function 向きを確かめる(){
   await httpsCallable(呼ぶ, "detectFacing", { timeout: 60000 })({});
 }
-// 背中の姿が無いアバターに、背中だけを足す（1回に数える）
+// 背中のアバターだけを足す（1回に数える）。⚠️ いまは画面から呼ばない（2026-10-10。手前の席のある場所を足すときのために残す）
 export async function 背中を足す(){
   await httpsCallable(呼ぶ, "addBack", { timeout: 300000 })({});
 }
@@ -172,20 +172,19 @@ function 席を合わせる(部屋, 席ら){
       （前は座った瞬間に記録を作り、1分ごとに延ばしていた。閉じただけの回も残っていた） */
 let いま = null;   // 座っているあいだの覚え（形は 席の決まり.js の 座った覚え）
 
-// 順：座ってみる席の番号の並び（画面の 座る順 が、空いたベンチを優先してランダムに決める）。数なら 0,1,2… の順
+// 順：座ってみる席の番号の並び（画面の 座る順 が、空いたベンチを優先してランダムに決める）
 export async function 座る(部屋, 題, 順, 本 = ""){
   座りかけ = true;
   try{ return await 座ってみる(部屋, 題, 順, 本); }
   finally{ 座りかけ = false; }
 }
 async function 座ってみる(部屋, 題, 順, 本){
-  const 番ら = typeof 順 === "number" ? [...Array(順).keys()] : 順;
   await 立つ();
   // ほかのタブで座ったままの自分の席を片づける
   const 今の席ら = await getDocs(collection(db, "rooms", 部屋, "seats"));
   await Promise.all(今の席ら.docs.filter(d=>d.data().uid === 私.uid).map(d=>deleteDoc(d.ref)));
 
-  for(const 番 of 番ら){
+  for(const 番 of 順){
     const r = doc(db, "rooms", 部屋, "seats", String(番));
     try{
       await runTransaction(db, async tx=>{
@@ -327,7 +326,7 @@ export async function 短縮リンクを辿る(url){
 // 読み方は、人それぞれ：冊数・ページ数・時間の、それぞれ上位3人（functions の readerStats が数える）
 export async function 読み方を読む(){
   const r = (await httpsCallable(呼ぶ, "readerStats", { timeout: 30000 })({})).data || {};
-  const 直す = xs => (xs || []).map(x=>({ uid:x.uid, 名:x.name, 顔:x.face, 数:x.value }));
+  const 直す = xs => (xs || []).map(x=>({ 名:x.name, 顔:x.face, 数:x.value }));   // uid は返ってこない（2026-10-10）
   const 本の直す = xs => (xs || []).map(x=>({ 題:x.title, 本:x.book || "", 数:x.value }));
   const 本 = r.bookRank || {};
   return { 冊:直す(r.books), ページ:直す(r.pages), 分:直す(r.minutes),

@@ -41,7 +41,7 @@ let 向きを確かめた = false;
 
 document.addEventListener("click", e=>{
   const el = e.target.closest("[data-する]");
-  if(!el || el.tagName === "INPUT") return;
+  if(!el) return;
   動き[el.dataset.する]?.(el, e);
 });
 

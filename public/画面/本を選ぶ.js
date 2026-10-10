@@ -4,7 +4,7 @@
    ============================================================ */
 import { 部屋ら } from "../部屋.js";
 import { AmazonのASIN, ISBN13にする, ISBNで確かめる } from "../書誌.js";
-import { 土台, 状態, 動き, 窓が閉じたら, 逃, 知らせる, 窓を出す, 窓を閉じる, 待ちの画面 } from "./共通.js";
+import { 土台, 状態, 動き, 変わったら, 打ったら, 窓が閉じたら, 逃, 知らせる, 窓を出す, 窓を閉じる, 待ちの画面 } from "./共通.js";
 import { 表紙, 本の見出し } from "./本.js";
 
 // 場所.js が登録する（このファイルからは場所.js を読み込まない）
@@ -19,10 +19,11 @@ export const 窓口 = { 手もとを描く:()=>{} };
    ⚠️ 前は題を自由に打ち込んでいた。同じ本が表記ゆれで別の本になるのを防ぐため、登録済みから選ぶ形にした */
 export let 本窓 = null;   // { やること, 出す, 本ら, 選んだ, 探す, 申請, 送信中 }
 
-const 前の本 = () =>{ try{ return localStorage.getItem("gemuの前の本") || ""; }catch{ return ""; } };
+const 前の本の鍵 = "gemuの前の本";   // この端末の localStorage に、前に選んだ本の id を覚える
+const 前の本 = () =>{ try{ return localStorage.getItem(前の本の鍵) || ""; }catch{ return ""; } };
 
 // 読了した本は、次の「いま読む本」の画面で選んだ状態にしない
-export const 前の本を忘れる = () =>{ try{ localStorage.removeItem("gemuの前の本"); }catch{} };
+export const 前の本を忘れる = () =>{ try{ localStorage.removeItem(前の本の鍵); }catch{} };
 
 export async function 題の窓(やること){
   const w = 本窓 = { やること, 出す:true, 本ら:null, 選んだ:null, 探す:"", 申請:false, 送信中:false };
@@ -68,25 +69,25 @@ function 本の窓を描く(){
     <p class="窓の文 小さく">一覧に無い本を教えてください。管理者が確かめてから<b>本登録</b>にします。
       それまでは<b>仮登録</b>ですが、申請したあなたは、この本ですぐに${座る ? "座れます" : "替えられます"}。</p>
     ${/* Amazon のリンク・ISBN から書誌を引く（Hongaeshi の申請の窓と同じ。2026-09-30 配信者） */ ""}
-    <label class="名札" for="申amazon">Amazon の URL（任意・ここから書誌を引けます）</label>
+    <label class="欄の名" for="申amazon">Amazon の URL（任意・ここから書誌を引けます）</label>
     <div class="欄と釦">
       <input id="申amazon" class="欄" placeholder="https://www.amazon.co.jp/…/dp/4166612476">
       <button class="釦 枠だけ 小" data-する="Amazonから読む">読み取る</button>
     </div>
     <p class="注">紙の本の URL なら、書籍名・著者名・出版社名を自動で入れます。短縮リンク（amzn.asia/… など）も使えます。<b>リンク自体は保存しません。</b></p>
-    <label class="名札" for="申isbn">ISBN（わかれば。あると確実です）</label>
+    <label class="欄の名" for="申isbn">ISBN（わかれば。あると確実です）</label>
     <div class="欄と釦">
       <input id="申isbn" class="欄" maxlength="20" inputmode="numeric" placeholder="9784166612475">
       <button class="釦 枠だけ 小" data-する="ISBNを確かめる">確かめる</button>
     </div>
     <div id="申請の確認"></div>
-    <label class="名札" for="申題">書籍名（必須）</label>
+    <label class="欄の名" for="申題">書籍名（必須）</label>
     <input id="申題" class="欄" maxlength="120" value="${逃(w.探す)}">
-    <label class="名札" for="申著">著者名（必須）</label>
+    <label class="欄の名" for="申著">著者名（必須）</label>
     <input id="申著" class="欄" maxlength="80">
-    <label class="名札" for="申版元">出版社名（必須）</label>
+    <label class="欄の名" for="申版元">出版社名（必須）</label>
     <input id="申版元" class="欄" maxlength="80">
-    <label class="名札" for="申ひとこと">ひとこと（任意）</label>
+    <label class="欄の名" for="申ひとこと">ひとこと（任意）</label>
     <input id="申ひとこと" class="欄" maxlength="300" placeholder="例）文庫版です">
     <p class="注">書籍名だけでは別の本と取り違えるので、著者名と出版社名もお願いしています。</p>
     <div class="窓の釦">
@@ -95,12 +96,12 @@ function 本の窓を描く(){
     </div>`);
   窓を出す(座る ? "いま読む本" : "本を替える", `
     <div class="出すか">
-      <label><input type="radio" name="出すか" value="出す" ${w.出す ? "checked" : ""}> ユーザ名と書籍名を出す</label>
-      <label><input type="radio" name="出すか" value="伏せる" ${w.出す ? "" : "checked"}> ユーザ名だけを出す（書籍名は出さない）</label>
+      <label><input type="radio" name="出すか" data-変わる="出すか" value="出す" ${w.出す ? "checked" : ""}> ユーザ名と書籍名を出す</label>
+      <label><input type="radio" name="出すか" data-変わる="出すか" value="伏せる" ${w.出す ? "" : "checked"}> ユーザ名だけを出す（書籍名は出さない）</label>
     </div>
     ${w.出す ? `
-      <label class="名札" for="本をさがす">本をさがす</label>
-      <input id="本をさがす" class="欄" placeholder="書籍名か著者名" value="${逃(w.探す)}" autocomplete="off">
+      <label class="欄の名" for="本をさがす">本をさがす</label>
+      <input id="本をさがす" data-変わる="本をさがす" class="欄" placeholder="書籍名か著者名" value="${逃(w.探す)}" autocomplete="off">
       <div class="本の候補" id="本の候補">${本の候補()}</div>
       <div class="申請への入口">
         <span>一覧に無いときは</span>
@@ -155,7 +156,7 @@ async function 本で決める(el){
   if(w.出す && !w.選んだ) return 知らせる("本を選んでください", true);
   const 題 = w.出す ? w.選んだ.題 : "", 本 = w.出す ? w.選んだ.id : "";
   状態.いまの本 = w.出す ? w.選んだ : null;   // 読了のときに総ページ数をはじめから入れるため
-  try{ if(本) localStorage.setItem("gemuの前の本", 本); }catch{}
+  try{ if(本) localStorage.setItem(前の本の鍵, 本); }catch{}
   if(el) el.disabled = true;
   try{
     if(w.やること === "席に着く") await 土台.座る(状態.部屋, 題, 座る順(部屋ら[状態.部屋]), 本);
@@ -199,22 +200,22 @@ function 選んでいる本を描く(){
 }
 
 // 本をさがす欄は、打つたびに候補だけを描き直す（窓ごと描き直すと、打っている字の位置が飛ぶ）
-document.addEventListener("input", e=>{
-  if(e.target.id !== "本をさがす" || !本窓) return;
-  本窓.探す = e.target.value;
+打ったら.本をさがす = 欄=>{
+  if(!本窓) return;
+  本窓.探す = 欄.value;
   // 絞り込んで見えなくなった本は、選んでいない状態に戻す
   if(本窓.選んだ && !絞った本ら().some(b=>b.id === 本窓.選んだ.id)) 本窓.選んだ = null;
   const 候補 = document.getElementById("本の候補");
   const 新しい = 本の候補();
   if(候補 && 本窓.候補の控え !== 新しい){ 候補.innerHTML = 新しい; 本窓.候補の控え = 新しい; }
   選んでいる本を描く();
-});
+};
 
-document.addEventListener("change", e=>{
-  if(e.target.name !== "出すか" || !本窓) return;
-  本窓.出す = e.target.value === "出す";
+変わったら.出すか = 欄=>{
+  if(!本窓) return;
+  本窓.出す = 欄.value === "出す";
   本の窓を描く();
-});
+};
 
 窓が閉じたら.add(()=>{ 本窓 = null; });   // 閉じたら本の画面の状態も消す（読み込みのあとで開き直らないように）
 Object.assign(動き, {

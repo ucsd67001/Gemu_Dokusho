@@ -2,7 +2,7 @@
    GEMuの静かな読書会 ― 試しの土台（/demo）
 
    土台.js と**同じ名前の関数**を、Firebase を使わずにブラウザの中だけで動かす。
-   画面（app.js）は本体とまったく同じものを使う。
+   画面（app.js と 画面/）は本体とまったく同じものを使う。
 
    ・記録は localStorage。**タブごとに別の人**になる（sessionStorage に uid を持つ）。
      タブを2つ開くと、2人で同じ場所に座れる
@@ -159,19 +159,18 @@ function 席を合わせる(部屋, 席ら){
 }
 
 let いま = null;   // 座っているあいだの覚え（形は 席の決まり.js の 座った覚え）。記録は「読み終える」のときだけ
-// 順：座ってみる席の番号の並び（画面の 座る順 が、空いたベンチを優先してランダムに決める）。数なら 0,1,2… の順
+// 順：座ってみる席の番号の並び（画面の 座る順 が、空いたベンチを優先してランダムに決める）
 export async function 座る(部屋, 題, 順, 本 = ""){
   座りかけ = true;
   try{ return await 座ってみる(部屋, 題, 順, 本); }
   finally{ 座りかけ = false; }
 }
 async function 座ってみる(部屋, 題, 順, 本){
-  const 番ら = typeof 順 === "number" ? [...Array(順).keys()] : 順;
   await 立つ();
   const s = 読む();
   const 席ら = s.席[部屋] ||= {};
   for(const [番, x] of Object.entries(席ら)) if(x.uid === 私.uid) delete 席ら[番];
-  for(const 番 of 番ら){
+  for(const 番 of 順){
     const x = 席ら[番];
     if(x && x.uid !== 私.uid && 生きた席(x)) continue;
     席ら[番] = { uid:私.uid, 題, 本, 入った:Date.now(), 見た:Date.now() };
@@ -259,14 +258,20 @@ export async function 読み方を読む(){
   for(const r of (s.読了 || [])){ 足す(r.uid, "冊", 1); 足す(r.uid, "ページ", r.ページ || 0); }
   const 上位 = k => [...計].filter(([uid, v])=>Math.round(v[k]) > 0 && s.人[uid])
     .sort((a, b)=>b[1][k] - a[1][k]).slice(0, 3)
-    .map(([uid, v])=>({ uid, 名:s.人[uid].名, 顔:s.人[uid].アバター?.顔 || "", 数:Math.round(v[k]) }));
+    .map(([uid, v])=>({ 名:s.人[uid].名, 顔:s.人[uid].アバター?.顔 || "", 数:Math.round(v[k]) }));
   // 本のランキング（土台.js と同じく、本ごとに。試しの仲間の分も少し）
-  const 本の計 = new Map([["銀河鉄道の夜", { 読了:2, ページ:540, 分:180 }]]);
-  const 本に足す = (題, k, v)=>{ if(!題 || 題 === 題を出さない印) return; const y = 本の計.get(題) || { 読了:0, ページ:0, 分:0 }; y[k] += v; 本の計.set(題, y); };
-  for(const r of s.記録) 本に足す(r.題, "分", Math.max(0, r.終わり - r.始め) / 60000);
-  for(const r of (s.読了 || [])){ 本に足す(r.題, "読了", 1); 本に足す(r.題, "ページ", r.ページ || 0); }
-  const 本の上位 = k => [...本の計].filter(([, v])=>Math.round(v[k]) > 0)
-    .sort((a, b)=>b[1][k] - a[1][k]).slice(0, 3).map(([題, v])=>({ 題, 数:Math.round(v[k]) }));
+  // 本は id（無ければ書籍名）でまとめ、id も返す（本番の readerStats と同じ。表紙を出すため）
+  const 本の計 = new Map([["t:銀河鉄道の夜", { 題:"銀河鉄道の夜", 本:"", 読了:2, ページ:540, 分:180 }]]);
+  const 本に足す = (r, k, v)=>{
+    if(!r.題 || r.題 === 題を出さない印) return;
+    const 鍵 = r.本 || "t:" + r.題;
+    const y = 本の計.get(鍵) || { 題:r.題, 本:r.本 || "", 読了:0, ページ:0, 分:0 };
+    y[k] += v; 本の計.set(鍵, y);
+  };
+  for(const r of s.記録) 本に足す(r, "分", Math.max(0, r.終わり - r.始め) / 60000);
+  for(const r of (s.読了 || [])){ 本に足す(r, "読了", 1); 本に足す(r, "ページ", r.ページ || 0); }
+  const 本の上位 = k => [...本の計.values()].filter(v=>Math.round(v[k]) > 0)
+    .sort((a, b)=>b[k] - a[k]).slice(0, 3).map(v=>({ 題:v.題, 本:v.本, 数:Math.round(v[k]) }));
   return { 冊:上位("冊"), ページ:上位("ページ"), 分:上位("分"),
     本:{ 読了:本の上位("読了"), ページ:本の上位("ページ"), 分:本の上位("分") } };
 }
