@@ -59,6 +59,14 @@ export function Amazonの道(本){
     表紙:`https://m.media-amazon.com/images/P/${a}.01._SCLZZZZZZZ_.jpg` };
 }
 
+/* openBD の著者が「嶽村,智子 大山口,菜都美 酒井,祐貴子」（姓,名 を空白で並べる形）のときは、
+   「嶽村智子、大山口菜都美、酒井祐貴子」に直してから名寄せに渡す（2026-10-12『めくるめく数学。』で、3人が1つの名前になっていた）。
+   ⚠️ 名寄せ.js は Hongaeshi の写しなので、ここ（GEMu の側）で直す */
+function 姓名の形を直す(文字列){
+  const t = String(文字列 || "").trim();
+  return /^[^\s,]+,[^\s,]+(\s+[^\s,]+,[^\s,]+)*$/.test(t) ? t.split(/\s+/).map(x=>x.replace(",", "")).join("、") : t;
+}
+
 function 著者を読めるように(文字列){
   const 人ら = 著者をばらす(文字列 || "");
   if(!人ら.length) return 文字列 || "";
@@ -76,7 +84,8 @@ export async function ISBNで確かめる(isbn){
     // ページ数は ONIX の Extent（種類 11＝本文のページ数）にあれば使う
     const 広さ = x.onix?.DescriptiveDetail?.Extent || [];
     const ページ = Number((広さ.find(e=>e.ExtentType === "11") || 広さ[0])?.ExtentValue) || 0;
-    return { 題:v.title, 著:著者を読めるように(v.author), 版元:v.publisher || "",
+    // 書籍名に「 : 副題」が付いてくることがある（2026-10-12『めくるめく数学。 : 女性数学者たちが…』）。副題は外す（本棚の書籍名と同じ形）
+    return { 題:String(v.title).split(/\s+:\s+/)[0].trim(), 著:著者を読めるように(姓名の形を直す(v.author)), 版元:v.publisher || "",
       年:(v.pubdate || "").slice(0, 4), isbn:ISBN13にする(v.isbn || d) || d, ページ };
   }catch(e){ return null; }
 }
